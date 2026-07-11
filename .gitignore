@@ -105,3 +105,21 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# ==================================================
+# Large asset files - DO NOT COMMIT
+# ==================================================
+
+# 3D Models
+*.fbx
+*.obj
+*.blend
+*.blend1
+*.dae
+*.3ds
+*.max
+*.c4d
+*.stl
+
+environment/
+environment.meta
