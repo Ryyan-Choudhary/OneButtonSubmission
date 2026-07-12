@@ -6,12 +6,15 @@ namespace OneButtonSubmission.Components
     public class GameManager : MonoBehaviour
     {
         public bool HasWon { get; private set; }
+        public event System.Action OnWin;
 
         public void TriggerWin()
         {
             if (HasWon) return;
             HasWon = true;
-            Debug.Log("SUMMIT REACHED — YOU WIN");
+            OnWin?.Invoke();
         }
+
+        public void ResetWin() => HasWon = false;
     }
 }

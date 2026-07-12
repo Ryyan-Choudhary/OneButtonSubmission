@@ -2,20 +2,21 @@ using UnityEngine;
 
 namespace OneButtonSubmission.Components
 {
-    /// Minimal IMGUI HUD: shell count, reload bar, and an optional win banner.
+    /// Minimal IMGUI HUD: shells, pump bar, bullet-time meter, gun + level labels,
+    /// and a centered banner for level transitions.
     public class HudController : MonoBehaviour
     {
         public AmmoSystemBehaviour ammo;
         public GunController gun;
-        public bool ShowWin;
-        public GameManager gameManager;
+        public string levelName;
+        public string bannerText;
 
         void OnGUI()
         {
             GUI.skin.label.fontSize = 22;
 
             if (ammo != null && ammo.System != null)
-                GUI.Label(new Rect(20, 20, 300, 30),
+                GUI.Label(new Rect(20, 20, 320, 30),
                     $"SHELLS  {ammo.System.Current}/{ammo.System.Max}");
 
             if (gun != null)
@@ -36,18 +37,27 @@ namespace OneButtonSubmission.Components
                 GUI.color = prev;
 
                 if (!string.IsNullOrEmpty(gun.GunName))
-                    GUI.Label(new Rect(20, 98, 300, 28), gun.GunName);
+                    GUI.Label(new Rect(20, 98, 320, 28), gun.GunName);
             }
 
-            if (ShowWin || (gameManager != null && gameManager.HasWon))
+            if (!string.IsNullOrEmpty(levelName))
+            {
+                var right = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.UpperRight,
+                    fontSize = 22
+                };
+                GUI.Label(new Rect(Screen.width - 340, 20, 320, 30), levelName, right);
+            }
+
+            if (!string.IsNullOrEmpty(bannerText))
             {
                 var style = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 48,
+                    fontSize = 46,
                     alignment = TextAnchor.MiddleCenter
                 };
-                GUI.Label(new Rect(0, Screen.height / 2f - 40f, Screen.width, 80f),
-                    "SUMMIT REACHED", style);
+                GUI.Label(new Rect(0, Screen.height / 2f - 40f, Screen.width, 80f), bannerText, style);
             }
         }
     }

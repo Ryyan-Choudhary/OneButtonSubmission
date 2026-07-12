@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using OneButtonSubmission.Components;
@@ -6,12 +7,13 @@ using OneButtonSubmission.Core;
 
 namespace OneButtonSubmission.Bootstrap
 {
-    /// Builds the whole playable, colored, animated scene at runtime so pressing
-    /// Play is reproducible with no manual wiring. Twilight/dusk palette.
+    /// Builds the whole colored, animated, multi-level game at runtime. A persistent
+    /// rig (camera, lights, sky, HUD, materials) is built once; per-level content
+    /// (player+gun, terrain, pickups, summit, ridges) is torn down and rebuilt as
+    /// you progress. Twilight/dusk palette.
     public class GameBootstrap : MonoBehaviour
     {
         [Header("World")]
-        public float gravityY = -20f;
         public int backgroundSeed = 20260712;
 
         [Header("Camera")]
@@ -25,65 +27,44 @@ namespace OneButtonSubmission.Bootstrap
         [Header("Pickups")]
         public int pickupRefill = 3;
 
-        [Header("Level")]
-        public Vector2[] ledges = new Vector2[]
-        {
-            new Vector2(2f, 3f),
-            new Vector2(-2f, 6f),
-            new Vector2(3f, 9f),
-            new Vector2(-1f, 12f),
-            new Vector2(2f, 15f),
-        };
-        public Vector2[] routePickups = new Vector2[]
-        {
-            new Vector2(-2f, 7f),
-            new Vector2(2f, 13f),
-        };
-        public Vector2 summit = new Vector2(2f, 17f);
+        [Header("Transitions")]
+        public float levelBannerSeconds = 2f;
 
-        public PlayerBody Player { get; private set; }
-        public GunController Gun { get; private set; }
-        public AmmoSystemBehaviour Ammo { get; private set; }
-        public HudController Hud { get; private set; }
-        public GameManager Manager { get; private set; }
+        LevelConfig[] levels;
+        int currentLevel;
 
-        // materials
+        // persistent materials
         Material rockMat, groundMat, bodyMat, headMat, limbMat;
         Material gunMetalMat, gunWoodMat, muzzleMat, ammoMat, summitMat;
 
-        PlayerJuice playerJuice;
+        // persistent rig
         Camera builtCamera;
+        CameraFollow follow;
+        Material skyMat;
+        HudController hud;
+        GameManager manager;
+
+        // per-level
+        GameObject levelRoot;
+        AmmoSystemBehaviour ammo;
+        PlayerJuice playerJuice;
 
         void Awake()
         {
-            Physics.gravity = new Vector3(0f, gravityY, 0f);
+            levels = new[] { LevelConfig.Foothills(), LevelConfig.TheSpire() };
+
             BuildMaterials();
             BuildLights();
+            BuildCamera();
+            BuildSky(builtCamera);
+            hud = BuildHud();
+            manager = gameObject.AddComponent<GameManager>();
+            manager.OnWin += OnLevelComplete;
 
-            Player = BuildPlayer(new Vector3(0f, 2f, 0f));
-            BuildGround(new Vector3(0f, -0.5f, 0f), new Vector3(50f, 1f, 4f));
-
-            Ammo = Player.gameObject.AddComponent<AmmoSystemBehaviour>();
-            Ammo.maxShells = maxShells;
-            Ammo.startShells = startShells;
-
-            Gun = BuildGun(Player);
-            BuildCamera(Player.transform);
-            BuildBackground(builtCamera);
-
-            BuildAmmoPickup(new Vector3(3f, 1f, 0f));
-            Hud = BuildHud(Ammo, Gun);
-
-            Manager = gameObject.AddComponent<GameManager>();
-            BuildLedges();
-            foreach (var p in routePickups) BuildAmmoPickup(new Vector3(p.x, p.y, 0f));
-            BuildSummit(new Vector3(summit.x, summit.y, 0f), Manager);
-            Hud.gameManager = Manager;
-
-            BuildMuzzleFlash(Gun);
+            BuildLevel(0);
         }
 
-        // ---------- materials ----------
+        // ---------- persistent build ----------
 
         void BuildMaterials()
         {
@@ -99,33 +80,12 @@ namespace OneButtonSubmission.Bootstrap
             summitMat   = MaterialFactory.Emissive(Palette.Summit, Palette.Summit, 1.2f);
         }
 
-        // ---------- shared helper ----------
-
-        /// Creates a collider-less, colored primitive as a visual child.
-        GameObject Visual(PrimitiveType type, Transform parent, Vector3 lpos, Vector3 lscale,
-            Material mat, string name)
-        {
-            var go = GameObject.CreatePrimitive(type);
-            go.name = name;
-            var col = go.GetComponent<Collider>();
-            if (col != null) Destroy(col);
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = lpos;
-            go.transform.localScale = lscale;
-            var r = go.GetComponent<MeshRenderer>();
-            if (r != null && mat != null) r.sharedMaterial = mat;
-            return go;
-        }
-
-        // ---------- lighting ----------
-
         void BuildLights()
         {
             foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
                 if (l.type == LightType.Directional) Destroy(l.gameObject);
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = Palette.Ambient;
 
             var key = new GameObject("KeyLight").AddComponent<Light>();
             key.type = LightType.Directional;
@@ -141,7 +101,144 @@ namespace OneButtonSubmission.Bootstrap
             rim.transform.rotation = Quaternion.Euler(-20f, 150f, 0f);
         }
 
-        // ---------- player ----------
+        void BuildCamera()
+        {
+            Camera cam = Camera.main;
+            if (cam == null)
+            {
+                var camGo = new GameObject("Main Camera");
+                camGo.tag = "MainCamera";
+                cam = camGo.AddComponent<Camera>();
+            }
+            cam.orthographic = false;
+            cam.fieldOfView = 60f;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.farClipPlane = 150f;
+
+            follow = cam.gameObject.AddComponent<CameraFollow>();
+            follow.smoothTime = cameraSmoothTime;
+            follow.offset = cameraOffset;
+
+            builtCamera = cam;
+        }
+
+        void BuildSky(Camera cam)
+        {
+            skyMat = MaterialFactory.UnlitTexture(MakeVerticalGradient(Palette.SkyBottom, Palette.SkyTop, 256));
+            var sky = new GameObject("Sky");
+            var mf = sky.AddComponent<MeshFilter>();
+            var mr = sky.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = skyMat;
+
+            float d = cam.farClipPlane * 0.85f;
+            float aspect = Screen.height > 0 ? (float)Screen.width / Screen.height : 16f / 9f;
+            float h = 2f * d * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            float w = h * aspect;
+            mf.sharedMesh = MakeQuadMesh(w * 1.3f, h * 1.3f);
+            sky.transform.SetParent(cam.transform, false);
+            sky.transform.localPosition = new Vector3(0f, 0f, d);
+            sky.transform.localRotation = Quaternion.identity;
+        }
+
+        HudController BuildHud()
+        {
+            var go = new GameObject("HUD");
+            return go.AddComponent<HudController>();
+        }
+
+        // ---------- per-level build ----------
+
+        void BuildLevel(int index)
+        {
+            Time.timeScale = 1f; // safety: never carry slow-mo across a rebuild
+            currentLevel = index;
+            var lv = levels[index];
+
+            if (levelRoot != null) Destroy(levelRoot);
+            levelRoot = new GameObject($"Level_{index}");
+
+            Physics.gravity = new Vector3(0f, lv.gravityY, 0f);
+            RenderSettings.ambientLight = lv.ambient;
+            builtCamera.backgroundColor = lv.skyBottom;
+            skyMat.mainTexture = MakeVerticalGradient(lv.skyBottom, lv.skyTop, 256);
+
+            // player + gun
+            var player = BuildPlayer(new Vector3(lv.startPos.x, lv.startPos.y, 0f));
+            player.transform.SetParent(levelRoot.transform, true);
+            ammo = player.gameObject.AddComponent<AmmoSystemBehaviour>();
+            ammo.maxShells = maxShells;
+            ammo.startShells = startShells;
+            var gun = BuildGun(player, lv.gun);
+            BuildMuzzleFlash(gun);
+
+            // terrain
+            var ground = BuildGround(new Vector3(0f, -0.5f, 0f), new Vector3(50f, 1f, 4f));
+            ground.transform.SetParent(levelRoot.transform, true);
+            BuildLedges(lv.ledges, levelRoot.transform);
+
+            // pickups (one near the start plus the route ones)
+            Parent(BuildAmmoPickup(new Vector3(lv.startPos.x + 3f, lv.startPos.y - 1f, 0f)));
+            if (lv.routePickups != null)
+                foreach (var p in lv.routePickups)
+                    Parent(BuildAmmoPickup(new Vector3(p.x, p.y, 0f)));
+
+            // summit
+            Parent(BuildSummit(new Vector3(lv.summit.x, lv.summit.y, 0f), manager));
+
+            // parallax ridges
+            float[] factors = { 0.60f, 0.75f, 0.88f };
+            float[] depths = { 12f, 20f, 30f };
+            for (int r = 0; r < 3; r++)
+            {
+                var ridge = BuildRidge(r, depths[r], MaterialFactory.Unlit(Palette.Ridges[r]));
+                var pl = ridge.AddComponent<ParallaxLayer>();
+                pl.cam = builtCamera.transform;
+                pl.factor = factors[r];
+                Parent(ridge);
+            }
+
+            // retarget persistent systems onto the new content
+            follow.target = player.transform;
+            hud.ammo = ammo;
+            hud.gun = gun;
+            hud.levelName = lv.name;
+            hud.bannerText = "";
+            manager.ResetWin();
+        }
+
+        void Parent(GameObject go) => go.transform.SetParent(levelRoot.transform, true);
+
+        void OnLevelComplete()
+        {
+            if (currentLevel + 1 < levels.Length)
+                StartCoroutine(NextLevelRoutine());
+            else
+                hud.bannerText = "YOU CONQUERED THE MOUNTAIN";
+        }
+
+        IEnumerator NextLevelRoutine()
+        {
+            hud.bannerText = "LEVEL COMPLETE";
+            yield return new WaitForSecondsRealtime(levelBannerSeconds);
+            BuildLevel(currentLevel + 1);
+        }
+
+        // ---------- shared builders ----------
+
+        GameObject Visual(PrimitiveType type, Transform parent, Vector3 lpos, Vector3 lscale,
+            Material mat, string name)
+        {
+            var go = GameObject.CreatePrimitive(type);
+            go.name = name;
+            var col = go.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = lpos;
+            go.transform.localScale = lscale;
+            var r = go.GetComponent<MeshRenderer>();
+            if (r != null && mat != null) r.sharedMaterial = mat;
+            return go;
+        }
 
         PlayerBody BuildPlayer(Vector3 pos)
         {
@@ -180,20 +277,16 @@ namespace OneButtonSubmission.Bootstrap
             return ground;
         }
 
-        // ---------- shotgun ----------
-
-        GunController BuildGun(PlayerBody body)
+        GunController BuildGun(PlayerBody body, GunConfig cfg)
         {
             var pivot = new GameObject("GunPivot");
             pivot.transform.SetParent(body.transform, false);
             pivot.transform.localPosition = new Vector3(0f, 0.1f, 0f);
 
-            // Arm sweeps with the gun, reaching from the body out to the receiver.
             var arm = Visual(PrimitiveType.Cylinder, pivot.transform,
                 new Vector3(0.45f, 0f, 0f), new Vector3(0.12f, 0.45f, 0.12f), limbMat, "Arm");
             arm.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
 
-            // Gun parts live under a container that recoils on fire.
             var parts = new GameObject("GunParts");
             parts.transform.SetParent(pivot.transform, false);
 
@@ -209,72 +302,12 @@ namespace OneButtonSubmission.Bootstrap
             var gun = body.gameObject.AddComponent<GunController>();
             gun.gunPivot = pivot.transform;
             gun.playerBody = body;
-            gun.ammo = Ammo;
-            gun.Configure(GunConfig.Blaster());
+            gun.ammo = ammo;
+            gun.Configure(cfg);
 
             recoil.gun = gun;
             if (playerJuice != null) playerJuice.gun = gun;
             return gun;
-        }
-
-        // ---------- camera ----------
-
-        void BuildCamera(Transform target)
-        {
-            Camera cam = Camera.main;
-            if (cam == null)
-            {
-                var camGo = new GameObject("Main Camera");
-                camGo.tag = "MainCamera";
-                cam = camGo.AddComponent<Camera>();
-            }
-            cam.orthographic = false;
-            cam.fieldOfView = 60f;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = Palette.SkyBottom;
-            cam.farClipPlane = 150f;
-
-            var follow = cam.gameObject.AddComponent<CameraFollow>();
-            follow.target = target;
-            follow.smoothTime = cameraSmoothTime;
-            follow.offset = cameraOffset;
-
-            builtCamera = cam;
-        }
-
-        // ---------- background ----------
-
-        void BuildBackground(Camera cam)
-        {
-            if (cam == null) return;
-
-            // Gradient sky as a double-sided camera child so it always fills the view.
-            var tex = MakeVerticalGradient(Palette.SkyBottom, Palette.SkyTop, 256);
-            var skyMat = MaterialFactory.UnlitTexture(tex);
-            var sky = new GameObject("Sky");
-            var skyMf = sky.AddComponent<MeshFilter>();
-            var skyMr = sky.AddComponent<MeshRenderer>();
-            skyMr.sharedMaterial = skyMat;
-
-            float d = cam.farClipPlane * 0.85f;
-            float aspect = Screen.height > 0 ? (float)Screen.width / Screen.height : 16f / 9f;
-            float h = 2f * d * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            float w = h * aspect;
-            skyMf.sharedMesh = MakeQuadMesh(w * 1.3f, h * 1.3f);
-            sky.transform.SetParent(cam.transform, false);
-            sky.transform.localPosition = new Vector3(0f, 0f, d);
-            sky.transform.localRotation = Quaternion.identity;
-
-            // Parallax mountain ridges behind the play plane.
-            float[] factors = { 0.60f, 0.75f, 0.88f };
-            float[] depths = { 12f, 20f, 30f };
-            for (int i = 0; i < 3; i++)
-            {
-                var ridge = BuildRidge(i, depths[i], MaterialFactory.Unlit(Palette.Ridges[i]));
-                var pl = ridge.AddComponent<ParallaxLayer>();
-                pl.cam = cam.transform;
-                pl.factor = factors[i];
-            }
         }
 
         GameObject BuildRidge(int index, float depth, Material mat)
@@ -337,7 +370,6 @@ namespace OneButtonSubmission.Bootstrap
                 new Vector2(0f, 0f), new Vector2(1f, 0f),
                 new Vector2(0f, 1f), new Vector2(1f, 1f),
             });
-            // double-sided
             mesh.SetTriangles(new List<int> { 0, 2, 1, 1, 2, 3, 0, 1, 2, 1, 3, 2 }, 0);
             mesh.RecalculateBounds();
             return mesh;
@@ -356,8 +388,6 @@ namespace OneButtonSubmission.Bootstrap
             return tex;
         }
 
-        // ---------- pickups / ledges / summit ----------
-
         GameObject BuildAmmoPickup(Vector3 pos)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -372,19 +402,21 @@ namespace OneButtonSubmission.Bootstrap
             return go;
         }
 
-        void BuildLedges()
+        void BuildLedges(Vector2[] ledges, Transform parent)
         {
+            if (ledges == null) return;
             foreach (var l in ledges)
             {
                 var ledge = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 ledge.name = "Ledge";
                 ledge.transform.position = new Vector3(l.x, l.y, 0f);
                 ledge.transform.localScale = new Vector3(2.5f, 0.5f, 4f);
+                ledge.transform.SetParent(parent, true);
                 ledge.GetComponent<MeshRenderer>().sharedMaterial = rockMat;
             }
         }
 
-        GameObject BuildSummit(Vector3 pos, GameManager manager)
+        GameObject BuildSummit(Vector3 pos, GameManager gm)
         {
             var flag = GameObject.CreatePrimitive(PrimitiveType.Cube);
             flag.name = "Summit";
@@ -395,21 +427,12 @@ namespace OneButtonSubmission.Bootstrap
             mr.sharedMaterial = summitMat;
 
             var trigger = flag.AddComponent<SummitTrigger>();
-            trigger.gameManager = manager;
+            trigger.gameManager = gm;
 
             var pulse = flag.AddComponent<SummitPulse>();
             pulse.target = mr;
             pulse.emission = Palette.Summit;
             return flag;
-        }
-
-        HudController BuildHud(AmmoSystemBehaviour ammo, GunController gun)
-        {
-            var go = new GameObject("HUD");
-            var hud = go.AddComponent<HudController>();
-            hud.ammo = ammo;
-            hud.gun = gun;
-            return hud;
         }
 
         void BuildMuzzleFlash(GunController gun)
@@ -425,7 +448,7 @@ namespace OneButtonSubmission.Bootstrap
             main.startSize = 0.3f;
             main.startColor = Palette.Muzzle;
             var emission = ps.emission;
-            emission.enabled = false; // emitted manually on fire
+            emission.enabled = false;
             ps.Stop();
 
             gun.OnFired += () => ps.Emit(12);
