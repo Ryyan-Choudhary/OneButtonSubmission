@@ -1,0 +1,10 @@
+{
+    "name": "OneButtonSubmission.Tests.EditMode",
+    "references": ["OneButtonSubmission", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "precompiledReferences": ["nunit.framework.dll"],
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+    "autoReferenced": false,
+    "overrideReferences": true
+}

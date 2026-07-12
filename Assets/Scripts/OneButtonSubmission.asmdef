@@ -1,0 +1,8 @@
+{
+    "name": "OneButtonSubmission",
+    "rootNamespace": "OneButtonSubmission",
+    "references": ["Unity.InputSystem"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "autoReferenced": true
+}
