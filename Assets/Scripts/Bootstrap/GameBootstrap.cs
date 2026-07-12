@@ -26,10 +26,27 @@ namespace OneButtonSubmission.Bootstrap
         [Header("Pickups")]
         public int pickupRefill = 3;
 
+        [Header("Level")]
+        public Vector2[] ledges = new Vector2[]
+        {
+            new Vector2(2f, 3f),
+            new Vector2(-2f, 6f),
+            new Vector2(3f, 9f),
+            new Vector2(-1f, 12f),
+            new Vector2(2f, 15f),
+        };
+        public Vector2[] routePickups = new Vector2[]
+        {
+            new Vector2(-2f, 7f),
+            new Vector2(2f, 13f),
+        };
+        public Vector2 summit = new Vector2(2f, 17f);
+
         public PlayerBody Player { get; private set; }
         public GunController Gun { get; private set; }
         public AmmoSystemBehaviour Ammo { get; private set; }
         public HudController Hud { get; private set; }
+        public GameManager Manager { get; private set; }
 
         void Awake()
         {
@@ -43,6 +60,11 @@ namespace OneButtonSubmission.Bootstrap
             BuildCamera(Player.transform);
             BuildAmmoPickup(new Vector3(3f, 1f, 0f));
             Hud = BuildHud(Ammo, Gun);
+            Manager = gameObject.AddComponent<GameManager>();
+            BuildLedges();
+            foreach (var p in routePickups) BuildAmmoPickup(new Vector3(p.x, p.y, 0f));
+            BuildSummit(new Vector3(summit.x, summit.y, 0f), Manager);
+            Hud.gameManager = Manager;
         }
 
         PlayerBody BuildPlayer(Vector3 pos)
@@ -128,6 +150,30 @@ namespace OneButtonSubmission.Bootstrap
             hud.ammo = ammo;
             hud.gun = gun;
             return hud;
+        }
+
+        void BuildLedges()
+        {
+            foreach (var l in ledges)
+            {
+                var ledge = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                ledge.name = "Ledge";
+                ledge.transform.position = new Vector3(l.x, l.y, 0f);
+                ledge.transform.localScale = new Vector3(2.5f, 0.5f, 4f);
+            }
+        }
+
+        GameObject BuildSummit(Vector3 pos, GameManager manager)
+        {
+            var flag = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            flag.name = "Summit";
+            flag.transform.position = pos;
+            flag.transform.localScale = new Vector3(1.5f, 3f, 4f);
+            var col = flag.GetComponent<Collider>();
+            col.isTrigger = true;
+            var trigger = flag.AddComponent<SummitTrigger>();
+            trigger.gameManager = manager;
+            return flag;
         }
     }
 }

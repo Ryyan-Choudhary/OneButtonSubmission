@@ -8,6 +8,7 @@ namespace OneButtonSubmission.Components
         public AmmoSystemBehaviour ammo;
         public GunController gun;
         public bool ShowWin;
+        public GameManager gameManager;
 
         void OnGUI()
         {
@@ -24,7 +25,7 @@ namespace OneButtonSubmission.Components
                     GUIContent.none);
             }
 
-            if (ShowWin)
+            if (ShowWin || (gameManager != null && gameManager.HasWon))
             {
                 var style = new GUIStyle(GUI.skin.label)
                 {
