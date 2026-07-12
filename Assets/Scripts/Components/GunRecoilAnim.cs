@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace OneButtonSubmission.Components
 {
-    /// Kicks the visible gun parts backward (along -X of the pivot) on each shot,
-    /// then eases them home. Purely cosmetic — physics recoil lives in PlayerBody.
+    /// Kicks the visible gun parts backward (along local -X) on each shot,
+    /// then eases them home. Purely cosmetic — physics recoil lives in GunBody.
     public class GunRecoilAnim : MonoBehaviour
     {
         public GunController gun;

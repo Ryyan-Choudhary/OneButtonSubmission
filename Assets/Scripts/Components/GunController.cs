@@ -5,22 +5,21 @@ using OneButtonSubmission.Core;
 namespace OneButtonSubmission.Components
 {
     /// The one-button heart. Z (or gamepad right-trigger) is the only input:
-    ///   - quick TAP  -> snap shot at the current flip angle
-    ///   - HOLD       -> bullet time (slow-mo) to aim the slow-flipping gun
-    ///   - RELEASE    -> precise shot (slightly stronger)
-    /// Bullet time drains a metered budget and then must cool down.
+    ///   - PRESS   -> fire immediately; recoil launches and spins the gun
+    ///   - HOLD    -> bullet time (slow-mo) to watch the tumble
+    ///   - RELEASE -> aimed follow-up shot (slightly stronger)
+    /// There is no aim arrow: the gun's physical rotation IS the aim, so
+    /// mid-air shots are timed against the tumble.
     public class GunController : MonoBehaviour
     {
         [Header("Wiring (set by bootstrap)")]
-        public Transform gunPivot;
-        public PlayerBody playerBody;
+        public GunBody body;
         public AmmoSystemBehaviour ammo;
 
         [Header("Input")]
-        public float holdThreshold = 0.18f; // hold longer than this = aim, else = tap
+        public float holdThreshold = 0.18f; // held longer than this = bullet time
 
         GunConfig config;
-        float angleDeg;
         FireGate fireGate;
         BulletTimeState bulletTime;
         InputAction fireAction;
@@ -29,10 +28,10 @@ namespace OneButtonSubmission.Components
         bool holding;
         bool enteredBT;
         float pressTime;
+        bool firstShotDone; // the level-opening shot launches straight up
 
         public event System.Action OnFired;
 
-        public float CurrentAngle => angleDeg;
         public float ReloadProgress => fireGate == null ? 1f : fireGate.ReloadProgress(Time.unscaledTime);
         public float BulletMeter => bulletTime == null ? 1f : bulletTime.MeterFill;
         public bool BulletActive => bulletTime != null && bulletTime.IsActive;
@@ -57,6 +56,7 @@ namespace OneButtonSubmission.Components
             config = cfg;
             fireGate = new FireGate(cfg.fireCooldown);
             bulletTime = new BulletTimeState(cfg.bulletTimeDuration, cfg.bulletTimeCooldown);
+            firstShotDone = false;
         }
 
         void OnEnable() => fireAction?.Enable();
@@ -72,6 +72,7 @@ namespace OneButtonSubmission.Components
             holding = true;
             enteredBT = false;
             pressTime = Time.unscaledTime;
+            FireShot(false); // shoot the instant the button goes down
         }
 
         void OnRelease(InputAction.CallbackContext ctx)
@@ -80,24 +81,15 @@ namespace OneButtonSubmission.Components
             holding = false;
             if (enteredBT)
             {
-                FireShot(true);
+                FireShot(true); // the aimed shot, timed against the slow tumble
                 ExitBulletTime();
                 enteredBT = false;
-            }
-            else
-            {
-                FireShot(false); // snap shot on a quick tap
             }
         }
 
         void Update()
         {
             if (config == null) return;
-
-            // Gun sweep uses SCALED time, so it flips slowly during bullet time.
-            angleDeg = GunRotator.Advance(angleDeg, config.sweepSpeed, Time.deltaTime);
-            if (gunPivot != null)
-                gunPivot.rotation = Quaternion.Euler(0f, 0f, angleDeg);
 
             // Meter/cooldown run on UNSCALED time.
             bool depleted = bulletTime.Tick(Time.unscaledDeltaTime);
@@ -125,12 +117,19 @@ namespace OneButtonSubmission.Components
         bool FireShot(bool precise)
         {
             float now = Time.unscaledTime;
-            if (!precise && !fireGate.CanFire(now)) return false; // snap respects pump cooldown
+            if (!fireGate.CanFire(now)) return false; // EVERY shot respects the pump cooldown
             if (!HasAmmo()) return false;
             if (ammo != null) ammo.System.TryConsume();
 
-            float force = config.recoilForce * (precise ? config.preciseMultiplier : 1f);
-            playerBody.ApplyRecoil(RecoilCalculator.Impulse(angleDeg, force));
+            float mult = precise ? config.preciseMultiplier : 1f;
+            // the level's opening shot is a clean vertical serve: straight up,
+            // spin included, so the player starts airborne and aiming
+            Vector2 impulse = firstShotDone
+                ? RecoilCalculator.Impulse(body.BarrelAngleDeg, config.recoilForce * mult,
+                    config.jumpBoost * mult)
+                : Vector2.up * config.recoilForce;
+            firstShotDone = true;
+            body.ApplyRecoil(impulse, config.spinImpulse * mult, config.opposingCancel);
             fireGate.RegisterFire(now);
             OnFired?.Invoke();
             return true;

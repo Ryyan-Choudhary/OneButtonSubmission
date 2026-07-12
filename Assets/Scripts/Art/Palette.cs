@@ -28,6 +28,9 @@ namespace OneButtonSubmission.Art
         public static readonly Color Ammo   = new Color(0.10f, 0.85f, 0.80f);
         public static readonly Color Summit = new Color(1.00f, 0.80f, 0.30f);
 
+        // Aim laser
+        public static readonly Color Laser = new Color(1.00f, 0.22f, 0.18f);
+
         // Background ridge layers (near -> far)
         public static readonly Color[] Ridges =
         {

@@ -11,6 +11,14 @@ namespace OneButtonSubmission.Components
 
         Vector3 velocity;
 
+        public void SnapToTarget()
+        {
+            if (target == null) return;
+            velocity = Vector3.zero;
+            transform.position = new Vector3(target.position.x, target.position.y, 0f) + offset;
+            transform.rotation = Quaternion.identity;
+        }
+
         void LateUpdate()
         {
             if (target == null) return;

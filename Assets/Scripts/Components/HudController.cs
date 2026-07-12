@@ -2,13 +2,13 @@ using UnityEngine;
 
 namespace OneButtonSubmission.Components
 {
-    /// Minimal IMGUI HUD: shells, pump bar, bullet-time meter, gun + level labels,
+    /// Minimal IMGUI HUD: shells, pump bar, bullet-time meter, level number,
     /// and a centered banner for level transitions.
     public class HudController : MonoBehaviour
     {
         public AmmoSystemBehaviour ammo;
         public GunController gun;
-        public string levelName;
+        public int levelNumber;
         public string bannerText;
 
         void OnGUI()
@@ -35,19 +35,16 @@ namespace OneButtonSubmission.Components
                 GUI.color = btCol;
                 GUI.Box(new Rect(20, 76, 200f * Mathf.Clamp01(gun.BulletMeter), 16f), GUIContent.none);
                 GUI.color = prev;
-
-                if (!string.IsNullOrEmpty(gun.GunName))
-                    GUI.Label(new Rect(20, 98, 320, 28), gun.GunName);
             }
 
-            if (!string.IsNullOrEmpty(levelName))
+            if (levelNumber > 0)
             {
                 var right = new GUIStyle(GUI.skin.label)
                 {
                     alignment = TextAnchor.UpperRight,
                     fontSize = 22
                 };
-                GUI.Label(new Rect(Screen.width - 340, 20, 320, 30), levelName, right);
+                GUI.Label(new Rect(Screen.width - 200, 20, 180, 30), $"Level-{levelNumber}", right);
             }
 
             if (!string.IsNullOrEmpty(bannerText))
