@@ -434,10 +434,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a81a4593c4df854ea879c7a6b0c7bde, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraTrack
-  target: {fileID: 1358108290}
-  floor: {fileID: 861645031}
-  smoothTime: 0.1
-  minHeightOffset: 100
 --- !u!1 &1358108286
 GameObject:
   m_ObjectHideFlags: 0
@@ -611,10 +607,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 1358108286}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bee0b3f4476373f4ba2fe5bf4e8acca5, type: 3}
+  m_Script: {fileID: 0}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CustomGravity
-  gravityMultiplier: 50
 --- !u!114 &1358108294
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -624,11 +619,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 1358108286}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: acec818574c431f478aeaa6cb5d4f947, type: 3}
+  m_Script: {fileID: 0}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallMovement
-  moveForce: 1000
-  jumpForce: 50
 --- !u!1 &1406191754
 GameObject:
   m_ObjectHideFlags: 0
