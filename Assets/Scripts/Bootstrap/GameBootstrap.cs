@@ -65,6 +65,7 @@ namespace OneButtonSubmission.Bootstrap
             foreach (var p in routePickups) BuildAmmoPickup(new Vector3(p.x, p.y, 0f));
             BuildSummit(new Vector3(summit.x, summit.y, 0f), Manager);
             Hud.gameManager = Manager;
+            BuildMuzzleFlash(Gun);
         }
 
         PlayerBody BuildPlayer(Vector3 pos)
@@ -174,6 +175,25 @@ namespace OneButtonSubmission.Bootstrap
             var trigger = flag.AddComponent<SummitTrigger>();
             trigger.gameManager = manager;
             return flag;
+        }
+
+        void BuildMuzzleFlash(GunController gun)
+        {
+            var go = new GameObject("MuzzleFlash");
+            go.transform.SetParent(gun.gunPivot, false);
+            go.transform.localPosition = new Vector3(1.4f, 0f, 0f);
+
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.startLifetime = 0.15f;
+            main.startSpeed = 6f;
+            main.startSize = 0.3f;
+            main.startColor = new Color(1f, 0.8f, 0.2f);
+            var emission = ps.emission;
+            emission.enabled = false; // we emit manually on fire
+            ps.Stop();
+
+            gun.OnFired += () => ps.Emit(12);
         }
     }
 }

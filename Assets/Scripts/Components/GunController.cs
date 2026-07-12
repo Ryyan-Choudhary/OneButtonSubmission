@@ -19,6 +19,8 @@ namespace OneButtonSubmission.Components
         public PlayerBody playerBody;
         public AmmoSystemBehaviour ammo;
 
+        public event System.Action OnFired;
+
         float angleDeg;
         FireGate fireGate;
         InputAction fireAction;
@@ -57,6 +59,7 @@ namespace OneButtonSubmission.Components
             Vector2 impulse = RecoilCalculator.Impulse(angleDeg, recoilForce);
             playerBody.ApplyRecoil(impulse);
             fireGate.RegisterFire(now);
+            OnFired?.Invoke();
         }
     }
 }
