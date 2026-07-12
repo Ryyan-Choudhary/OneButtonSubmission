@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using OneButtonSubmission.Components;
 using OneButtonSubmission.Art;
+using OneButtonSubmission.Core;
 
 namespace OneButtonSubmission.Bootstrap
 {
@@ -16,11 +17,6 @@ namespace OneButtonSubmission.Bootstrap
         [Header("Camera")]
         public float cameraSmoothTime = 0.25f;
         public Vector3 cameraOffset = new Vector3(0f, 1.5f, -12f);
-
-        [Header("Gun")]
-        public float gunSweepSpeed = 120f;
-        public float recoilForce = 10f;
-        public float cooldownSeconds = 0.6f;
 
         [Header("Ammo")]
         public int maxShells = 6;
@@ -214,9 +210,7 @@ namespace OneButtonSubmission.Bootstrap
             gun.gunPivot = pivot.transform;
             gun.playerBody = body;
             gun.ammo = Ammo;
-            gun.rotationSpeedDegPerSec = gunSweepSpeed;
-            gun.recoilForce = recoilForce;
-            gun.cooldownSeconds = cooldownSeconds;
+            gun.Configure(GunConfig.Blaster());
 
             recoil.gun = gun;
             if (playerJuice != null) playerJuice.gun = gun;
