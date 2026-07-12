@@ -23,9 +23,13 @@ namespace OneButtonSubmission.Bootstrap
         public int maxShells = 6;
         public int startShells = 6;
 
+        [Header("Pickups")]
+        public int pickupRefill = 3;
+
         public PlayerBody Player { get; private set; }
         public GunController Gun { get; private set; }
         public AmmoSystemBehaviour Ammo { get; private set; }
+        public HudController Hud { get; private set; }
 
         void Awake()
         {
@@ -37,6 +41,8 @@ namespace OneButtonSubmission.Bootstrap
             Ammo.startShells = startShells;
             Gun = BuildGun(Player);
             BuildCamera(Player.transform);
+            BuildAmmoPickup(new Vector3(3f, 1f, 0f));
+            Hud = BuildHud(Ammo, Gun);
         }
 
         PlayerBody BuildPlayer(Vector3 pos)
@@ -100,6 +106,28 @@ namespace OneButtonSubmission.Bootstrap
             follow.target = target;
             follow.smoothTime = cameraSmoothTime;
             follow.offset = cameraOffset;
+        }
+
+        GameObject BuildAmmoPickup(Vector3 pos)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = "AmmoPickup";
+            go.transform.position = pos;
+            go.transform.localScale = Vector3.one * 0.6f;
+            var col = go.GetComponent<Collider>();
+            col.isTrigger = true;
+            var pickup = go.AddComponent<AmmoPickup>();
+            pickup.amount = pickupRefill;
+            return go;
+        }
+
+        HudController BuildHud(AmmoSystemBehaviour ammo, GunController gun)
+        {
+            var go = new GameObject("HUD");
+            var hud = go.AddComponent<HudController>();
+            hud.ammo = ammo;
+            hud.gun = gun;
+            return hud;
         }
     }
 }
