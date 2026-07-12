@@ -14,13 +14,28 @@ namespace OneButtonSubmission.Bootstrap
         public float cameraSmoothTime = 0.25f;
         public Vector3 cameraOffset = new Vector3(0f, 1.5f, -12f);
 
+        [Header("Gun")]
+        public float gunSweepSpeed = 120f;
+        public float recoilForce = 10f;
+        public float cooldownSeconds = 0.6f;
+
+        [Header("Ammo")]
+        public int maxShells = 6;
+        public int startShells = 6;
+
         public PlayerBody Player { get; private set; }
+        public GunController Gun { get; private set; }
+        public AmmoSystemBehaviour Ammo { get; private set; }
 
         void Awake()
         {
             Physics.gravity = new Vector3(0f, gravityY, 0f);
             Player = BuildPlayer(new Vector3(0f, 2f, 0f));
             BuildGround(new Vector3(0f, -0.5f, 0f), new Vector3(50f, 1f, 4f));
+            Ammo = Player.gameObject.AddComponent<AmmoSystemBehaviour>();
+            Ammo.maxShells = maxShells;
+            Ammo.startShells = startShells;
+            Gun = BuildGun(Player);
             BuildCamera(Player.transform);
         }
 
@@ -44,6 +59,30 @@ namespace OneButtonSubmission.Bootstrap
             ground.transform.position = pos;
             ground.transform.localScale = size;
             return ground;
+        }
+
+        GunController BuildGun(PlayerBody body)
+        {
+            // Pivot lives at the player's "hand"; a barrel box sticks out +X from it.
+            var pivot = new GameObject("GunPivot");
+            pivot.transform.SetParent(body.transform, false);
+            pivot.transform.localPosition = new Vector3(0f, 0.3f, 0f);
+
+            var barrel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            barrel.name = "Barrel";
+            Destroy(barrel.GetComponent<Collider>()); // visual only
+            barrel.transform.SetParent(pivot.transform, false);
+            barrel.transform.localScale = new Vector3(1.2f, 0.2f, 0.2f);
+            barrel.transform.localPosition = new Vector3(0.7f, 0f, 0f);
+
+            var gun = body.gameObject.AddComponent<GunController>();
+            gun.gunPivot = pivot.transform;
+            gun.playerBody = body;
+            gun.ammo = Ammo;
+            gun.rotationSpeedDegPerSec = gunSweepSpeed;
+            gun.recoilForce = recoilForce;
+            gun.cooldownSeconds = cooldownSeconds;
+            return gun;
         }
 
         void BuildCamera(Transform target)
