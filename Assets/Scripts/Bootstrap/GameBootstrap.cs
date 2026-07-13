@@ -87,10 +87,15 @@ namespace OneButtonSubmission.Bootstrap
 
         void BuildMaterials()
         {
+            // the gun self-glows faintly so it reads against dark skies
             gunMetalMat = MaterialFactory.Lit(Palette.GunMetal, 0.45f, 0.6f);
+            gunMetalMat.EnableKeyword("_EMISSION");
+            gunMetalMat.SetColor("_EmissionColor", Palette.GunMetal * 0.55f);
             gunWoodMat  = MaterialFactory.Lit(Palette.GunWood, 0.25f);
+            gunWoodMat.EnableKeyword("_EMISSION");
+            gunWoodMat.SetColor("_EmissionColor", Palette.GunWood * 0.5f);
             muzzleMat   = MaterialFactory.Emissive(Palette.Muzzle, Palette.Muzzle, 2.0f);
-            ammoMat     = MaterialFactory.Emissive(Palette.Ammo, Palette.Ammo, 1.6f);
+            ammoMat     = MaterialFactory.Emissive(Palette.AmmoHaze, Palette.AmmoHaze, 1.7f);
             laserMat    = MaterialFactory.Unlit(Palette.Laser);
 
             // the flanking towers: in-focus facade (unlike the hazy skyline),
@@ -214,6 +219,7 @@ namespace OneButtonSubmission.Bootstrap
 
             // summit: landing anywhere on the final shelf wins; the flag is a beacon
             Parent(BuildSummit(lv, lv.shelves[lv.shelves.Length - 1], manager, hud));
+            BuildNeonArrow(lv, levelRoot.transform);
 
             // parallax ridges
             float[] factors = { 0.60f, 0.75f, 0.88f };
@@ -273,6 +279,26 @@ namespace OneButtonSubmission.Bootstrap
 
         void Parent(GameObject go) => go.transform.SetParent(levelRoot.transform, true);
 
+        /// Club-style sign mounted mid-level (beside the middle building),
+        /// its arrow rotated to point the way toward Bond — a hint, not a
+        /// marker on his head.
+        void BuildNeonArrow(LevelConfig lv, Transform parent)
+        {
+            var last = lv.shelves[lv.shelves.Length - 1];
+            float shelfTop = last.cy + last.h * 0.5f;
+            Vector3 signPos = new Vector3(lv.signPos.x, lv.signPos.y, 1.6f);
+            Vector3 bond = new Vector3(lv.summit.x, shelfTop + 2f, 1.6f);
+            Vector2 dir = bond - signPos;
+            float ang = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+            var sign = new GameObject("NeonArrow");
+            sign.transform.position = signPos;
+            // the arrow points along local -Y, so +90 swings it onto the bearing
+            sign.transform.rotation = Quaternion.Euler(0f, 0f, ang + 90f);
+            sign.AddComponent<NeonSign>().Build();
+            sign.transform.SetParent(parent, true);
+        }
+
         /// The standard level entry: the gun smashes out of the right tower's
         /// window, already flying. Also the handoff point after the intro, so
         /// the kinematic -> dynamic switch is done strictly in order: wake the
@@ -292,7 +318,8 @@ namespace OneButtonSubmission.Bootstrap
             rb.rotation = Quaternion.identity;
             rb.WakeUp();
             rb.linearVelocity = new Vector3(-12f, 3.5f, 0f);
-            rb.angularVelocity = new Vector3(0f, 0f, 6f);
+            rb.maxAngularVelocity = 22f;                   // entry-only headroom...
+            rb.angularVelocity = new Vector3(0f, 0f, 18f); // ...to burst out spinning hard
             gun.enabled = true;
             GlassBurst.Spawn(new Vector3(lv.wallRight - 0.4f, lv.burstHeight, 0f),
                 Vector3.left, backgroundSeed ^ currentLevel);
@@ -410,6 +437,7 @@ namespace OneButtonSubmission.Bootstrap
         {
             var root = new GameObject("Gun");
             root.transform.position = pos;
+            root.transform.localScale = Vector3.one * 1.25f; // reads better at canyon scale
 
             var rb = root.AddComponent<Rigidbody>();
             rb.mass = 1f;
@@ -462,6 +490,14 @@ namespace OneButtonSubmission.Bootstrap
             var laser = laserGo.AddComponent<AimLaser>();
             laser.gunRoot = root.transform;
             laser.material = laserMat;
+
+            // a small warm light rides along so the gun lights its surroundings
+            var glow = new GameObject("GunGlow").AddComponent<Light>();
+            glow.type = LightType.Point;
+            glow.color = new Color(1f, 0.75f, 0.45f);
+            glow.range = 7f;
+            glow.intensity = 1.6f;
+            glow.transform.SetParent(root.transform, false);
 
             var gun = root.AddComponent<GunController>();
             gun.body = body;
@@ -849,6 +885,9 @@ namespace OneButtonSubmission.Bootstrap
 
             var ps = go.AddComponent<ParticleSystem>();
             var main = ps.main;
+            // never auto-play: SetActive(true) after the intro cutscene would
+            // otherwise dump a stray particle burst at the suitcase
+            main.playOnAwake = false;
             main.startLifetime = 0.15f;
             main.startSpeed = 6f;
             main.startSize = 0.3f;

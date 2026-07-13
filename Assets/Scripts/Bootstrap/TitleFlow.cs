@@ -184,23 +184,23 @@ namespace OneButtonSubmission.Bootstrap
 
             // title stack — anchored from top, each line gets its own row
             float top = Y(0.05f);
-            top = DrawRow("ONE BUTTON", elapsed, 0f, 34, Palette.Summit, top, pad, 40f);
+            top = DrawRow("ONE BUTTON", elapsed, 0f, S(44), Palette.Summit, top, pad, S(52));
             top += 10f;
-            DrawRow("SUBMISSION", elapsed, 0.12f, 26, Palette.Ammo, top, pad, 32f);
+            DrawRow("SUBMISSION", elapsed, 0.12f, S(32), Palette.Ammo, top, pad, S(40));
 
             // action stack — anchored from bottom so nothing collides with the gun
             float playIn = EaseOut(Mathf.Clamp01((elapsed - 0.35f) / 0.5f));
             float pulse = 1f + 0.04f * Mathf.Sin(t * 4.5f);
-            int playSize = Mathf.RoundToInt((40f + pulse * 6f) * playIn);
+            int playSize = Mathf.RoundToInt(S(Mathf.RoundToInt(48f + pulse * 7f)) * playIn);
             Color playCol = Color.Lerp(Palette.Summit, Palette.Muzzle, 0.5f + 0.5f * Mathf.Sin(t * 3f));
             playCol.a = playIn;
-            DrawBottomRow("PLAY", playSize, playCol, Y(0.26f), pad, 52f);
+            DrawBottomRow("PLAY", playSize, playCol, Y(0.26f), pad, S(60));
 
             float promptAlpha = EaseOut(Mathf.Clamp01((elapsed - 0.7f) / 0.4f));
             float bounce = Mathf.Abs(Mathf.Sin(t * 5f)) * 3f;
             Color promptCol = Palette.Ammo;
             promptCol.a = promptAlpha * (0.65f + 0.35f * Mathf.Sin(t * 6f));
-            DrawBottomRow("►  press Z", 20, promptCol, Y(0.17f) + bounce, pad, 28f);
+            DrawBottomRow("►  press Z", S(26), promptCol, Y(0.17f) + bounce, pad, S(36));
 
             DrawTagline(elapsed, pad);
         }
@@ -210,7 +210,7 @@ namespace OneButtonSubmission.Bootstrap
             float a = EaseOut(Mathf.Clamp01((elapsed - 1f) / 0.6f)) * 0.7f;
             if (a <= 0f) return;
             var col = new Color(0.85f, 0.82f, 0.95f, a);
-            DrawBottomRow("you ARE the gun", 16, col, Y(0.09f), pad, 24f);
+            DrawBottomRow("you ARE the gun", S(20), col, Y(0.09f), pad, S(30));
         }
 
         float DrawRow(string text, float elapsed, float delay, int size, Color color,
@@ -250,7 +250,7 @@ namespace OneButtonSubmission.Bootstrap
             DrawPrologueFrame(textTop, textHeight, boxIn);
 
             var textCol = Color.Lerp(new Color(1f, 0.92f, 0.82f, 0f), Color.white, boxIn);
-            DrawParagraph(shown, 22, textCol, pad, textTop + 18f, boxW, textHeight);
+            DrawParagraph(shown, S(32), textCol, pad, textTop + 18f, boxW, textHeight);
 
             if (chars >= PrologueText.Length)
             {
@@ -258,7 +258,7 @@ namespace OneButtonSubmission.Bootstrap
                 Color c = Palette.Ammo;
                 c.a = promptIn * (0.7f + 0.3f * Mathf.Sin(Time.unscaledTime * 5f));
                 float bounce = Mathf.Abs(Mathf.Sin(Time.unscaledTime * 4.5f)) * 4f;
-                DrawCentered("►  press Z", 22, c, Y(0.88f) + bounce, 32f);
+                DrawCentered("►  press Z", S(28), c, Y(0.88f) + bounce, S(38));
             }
         }
 
@@ -313,6 +313,10 @@ namespace OneButtonSubmission.Bootstrap
         }
 
         static float Y(float fraction) => Screen.height * fraction;
+
+        /// Design sizes are authored for a 720p canvas; scale UP for larger
+        /// screens but never below the authored size (small editor views).
+        static int S(int px) => Mathf.RoundToInt(px * Mathf.Max(1f, Screen.height / 720f));
 
         static void DrawLabel(string text, int fontSize, Color color,
             float x, float y, float width, float height, TextAnchor anchor)

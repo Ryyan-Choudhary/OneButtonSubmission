@@ -56,7 +56,7 @@ namespace OneButtonSubmission.Components
             float sy = Screen.height - screen.y;
 
             // Scale font with screen height, clamp for readability
-            int fontSize = Mathf.RoundToInt(Mathf.Clamp(Screen.height * 0.030f, 16f, 32f));
+            int fontSize = Mathf.Max(26, Mathf.RoundToInt(Screen.height * 0.036f));
 
             var style = new GUIStyle(GUI.skin.label)
             {

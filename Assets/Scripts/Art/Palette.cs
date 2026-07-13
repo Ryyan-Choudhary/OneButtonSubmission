@@ -25,8 +25,12 @@ namespace OneButtonSubmission.Art
         public static readonly Color Muzzle   = new Color(1.00f, 0.62f, 0.22f);
 
         // Pickups / summit (emissive)
-        public static readonly Color Ammo   = new Color(0.10f, 0.85f, 0.80f);
-        public static readonly Color Summit = new Color(1.00f, 0.80f, 0.30f);
+        public static readonly Color Ammo     = new Color(0.10f, 0.85f, 0.80f);
+        public static readonly Color AmmoHaze = new Color(0.66f, 0.42f, 0.98f); // violet, matches the shot haze
+        public static readonly Color Summit   = new Color(1.00f, 0.80f, 0.30f);
+
+        // Neon signage
+        public static readonly Color Neon = new Color(1.00f, 0.20f, 0.62f);
 
         // Aim laser
         public static readonly Color Laser = new Color(1.00f, 0.22f, 0.18f);

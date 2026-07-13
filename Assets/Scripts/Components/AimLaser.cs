@@ -9,7 +9,7 @@ namespace OneButtonSubmission.Components
     {
         public Transform gunRoot;
         public Vector3 localOrigin = new Vector3(0.9f, 0.12f, 0f);
-        public float maxLength = 40f;
+        public float maxLength = 8f; // a sight stub, not a searchlight
         public float width = 0.06f;
         public Material material;
 

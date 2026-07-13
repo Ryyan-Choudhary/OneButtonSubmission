@@ -9,7 +9,7 @@ namespace OneButtonSubmission.Core
         public float recoilForce = 16f;          // launch impulse per shot
         public float jumpBoost = 3f;             // flat upward kick added to every shot
         public float opposingCancel = 0.9f;      // 0..1: how much old velocity fighting a shot is cancelled
-        public float spinImpulse = 1.2f;         // angular kick per shot (muzzle flips gun-top-ward)
+        public float spinImpulse = 1.9f;         // angular kick per shot (muzzle flips gun-top-ward)
         public float fireCooldown = 0.2f;        // min seconds between snap shots (pump)
         public float bulletTimeScale = 0.12f;    // Time.timeScale while aiming
         public float bulletTimeDuration = 1.5f;  // real seconds of slo-mo available
@@ -20,7 +20,8 @@ namespace OneButtonSubmission.Core
         {
             displayName = "Blaster",
             recoilForce = 16f, jumpBoost = 3f, opposingCancel = 0.9f,
-            spinImpulse = 1.2f, fireCooldown = 0.2f,
+            spinImpulse = 1.9f, fireCooldown = 0.2f, // physics-equivalent of the original 1.2 on the 1.25x gun
+
             bulletTimeScale = 0.12f, bulletTimeDuration = 2.0f,
             bulletTimeCooldown = 3.0f, preciseMultiplier = 1.1f,
         };

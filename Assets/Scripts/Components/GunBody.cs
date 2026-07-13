@@ -20,6 +20,7 @@ namespace OneButtonSubmission.Components
                            | RigidbodyConstraints.FreezeRotationY;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+            rb.maxAngularVelocity = 7f; // Unity default: the tumble governor that keeps aim manageable
         }
 
         /// Barrel points along local +X; the physics rotation IS the aim.
@@ -30,6 +31,7 @@ namespace OneButtonSubmission.Components
         /// shot is cancelled first so the recoil direction always reads clearly.
         public void ApplyRecoil(Vector2 impulse, float spinImpulse, float opposingCancel)
         {
+            rb.maxAngularVelocity = 7f; // the entry pinwheel ends the moment you take control
             Vector2 v = RecoilCalculator.CancelOpposing(
                 new Vector2(rb.linearVelocity.x, rb.linearVelocity.y), impulse, opposingCancel);
             rb.linearVelocity = new Vector3(v.x, v.y, 0f);

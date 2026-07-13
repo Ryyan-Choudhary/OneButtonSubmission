@@ -40,6 +40,7 @@ namespace OneButtonSubmission.Bootstrap
         public Shelf[] shelves;          // LAST entry is the goal shelf (Bond's)
         public Vector2[] routePickups;
         public Vector2 summit;
+        public Vector2 signPos;          // neon arrow mount point (beside the middle building)
         public bool villainAtSummit;     // posts the rival on the second-to-last shelf
 
         /// Level 1: gentle rises (+6), wide balconies, a full center ladder of
@@ -75,6 +76,7 @@ namespace OneButtonSubmission.Bootstrap
                 new Vector2( -2f, 19.5f),
             },
             summit = new Vector2(-26f, 20f),
+            signPos = new Vector2(-9.5f, 13f), // left flank of the middle building
         };
 
         /// Level 2: wider canyon, +6.5 rises, and the finale floats at the
@@ -113,6 +115,7 @@ namespace OneButtonSubmission.Bootstrap
                 new Vector2(-32f, 31.5f),
             },
             summit = new Vector2(0f, 33.5f),
+            signPos = new Vector2(10.5f, 18f), // right flank of the middle building
         };
 
         /// Level 3: the widest canyon, +9-11 rises, sparser stones — and the
@@ -152,6 +155,7 @@ namespace OneButtonSubmission.Bootstrap
                 new Vector2(-10f, 33f), // on the arc past the rival, toward Bond
             },
             summit = new Vector2(-38f, 35f),
+            signPos = new Vector2(-12.5f, 21f), // left flank of the middle building
         };
     }
 }
