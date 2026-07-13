@@ -1,4 +1,5 @@
 using UnityEngine;
+using OneButtonSubmission.Audio;
 
 namespace OneButtonSubmission.Components
 {
@@ -25,6 +26,7 @@ namespace OneButtonSubmission.Components
             var ammo = other.GetComponentInParent<AmmoSystemBehaviour>();
             if (ammo == null) return;
             ammo.System.Refill(amount);
+            AudioManager.Play(AudioManager.Sfx.Reload);
             rend.enabled = false;
             col.enabled = false;
             Invoke(nameof(Respawn), respawnSeconds);

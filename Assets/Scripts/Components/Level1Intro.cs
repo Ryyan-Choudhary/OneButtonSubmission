@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using OneButtonSubmission.Art;
+using OneButtonSubmission.Audio;
 
 namespace OneButtonSubmission.Components
 {
@@ -214,6 +215,7 @@ namespace OneButtonSubmission.Components
             Vector3 casePos = suitcase.position;
             GlassBurst.Spawn(casePos + Vector3.up * 0.4f, Vector3.up, seed ^ 0x51,
                 new Color(0.35f, 0.22f, 0.12f), new Color(0.75f, 0.65f, 0.35f), 20);
+            AudioManager.Play(AudioManager.Sfx.Explosion);
             Destroy(suitcase.gameObject);
             shake = 0.55f;
 
@@ -237,6 +239,7 @@ namespace OneButtonSubmission.Components
             // ...then TEAR down the whole office, spinning, camera in pursuit,
             // Q shrinking into the background
             camMode = CamMode.Dash;
+            AudioManager.PlayLoop(AudioManager.Sfx.GunFlying);
             float speed = 6f;
             float spin = 0f;
             Vector3 pos = new Vector3(casePos.x, burstHeight, 0f);
@@ -256,6 +259,10 @@ namespace OneButtonSubmission.Components
 
             // through the glass — flash-cut to the outside of the tower
             GlassBurst.Spawn(new Vector3(lx - 0.4f, burstHeight, 0f), Vector3.left, seed ^ 0x7);
+            AudioManager.StopLoop();
+            // window-break SFX comes from LaunchEntry (via onLaunch below),
+            // which plays it for every level's entry — including this one
+            AudioManager.PlayThemeLoop();
             flash = 1f;
             camMode = CamMode.Off;
             onLaunch?.Invoke();

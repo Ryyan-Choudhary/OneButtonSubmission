@@ -1,4 +1,5 @@
 using UnityEngine;
+using OneButtonSubmission.Art;
 
 namespace OneButtonSubmission.Components
 {
@@ -58,14 +59,16 @@ namespace OneButtonSubmission.Components
             // Scale font with screen height, clamp for readability
             int fontSize = Mathf.Max(26, Mathf.RoundToInt(Screen.height * 0.036f));
 
+            // same noir poster face as the HUD (bold fallback if unavailable)
             var style = new GUIStyle(GUI.skin.label)
             {
                 fontSize = fontSize,
-                fontStyle = FontStyle.Bold,
+                fontStyle = NoirType.Font != null ? FontStyle.Normal : FontStyle.Bold,
                 alignment = TextAnchor.MiddleCenter,
                 wordWrap = false,
                 normal = { textColor = Color.white }
             };
+            if (NoirType.Font != null) style.font = NoirType.Font;
 
             GUIContent content = new GUIContent(labelText);
             Vector2 textSize = style.CalcSize(content);

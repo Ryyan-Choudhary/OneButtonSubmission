@@ -258,7 +258,11 @@ namespace OneButtonSubmission.Bootstrap
                 Color c = Palette.Ammo;
                 c.a = promptIn * (0.7f + 0.3f * Mathf.Sin(Time.unscaledTime * 5f));
                 float bounce = Mathf.Abs(Mathf.Sin(Time.unscaledTime * 4.5f)) * 4f;
-                DrawCentered("►  press Z", S(28), c, Y(0.88f) + bounce, S(38));
+                DrawCentered("►  press Z to fire", S(28), c, Y(0.84f) + bounce, S(34));
+
+                Color c2 = c;
+                c2.a *= 0.8f;
+                DrawCentered("hold Z to enter slo-mo", S(20), c2, Y(0.91f) + bounce, S(28));
             }
         }
 

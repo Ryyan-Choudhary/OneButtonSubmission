@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using OneButtonSubmission.Components;
 using OneButtonSubmission.Art;
+using OneButtonSubmission.Audio;
 using OneButtonSubmission.Core;
 
 namespace OneButtonSubmission.Bootstrap
@@ -42,6 +43,7 @@ namespace OneButtonSubmission.Bootstrap
         // persistent rig
         Camera builtCamera;
         CameraFollow follow;
+        SlowMoCameraFx slowMoFx;
         Material skyMat;
         HudController hud;
         GameManager manager;
@@ -52,7 +54,12 @@ namespace OneButtonSubmission.Bootstrap
 
         void Awake()
         {
-            levels = new[] { LevelConfig.Level1(), LevelConfig.Level2(), LevelConfig.Level3() };
+            levels = new[]
+            {
+                LevelConfig.Level1(), LevelConfig.Level2(), LevelConfig.Level3(),
+                LevelConfig.Level4(), LevelConfig.Level5(), LevelConfig.Level6(),
+                LevelConfig.Level7(), LevelConfig.Level8(), LevelConfig.Level9(),
+            };
 
             BuildMaterials();
             BuildLights();
@@ -70,6 +77,7 @@ namespace OneButtonSubmission.Bootstrap
 
         public void BeginGame()
         {
+            GameStats.Reset();   // fresh run, clean tally
             pendingIntro = true; // the suitcase cutscene plays once, not on retries
             BuildLevel(0);
         }
@@ -158,6 +166,9 @@ namespace OneButtonSubmission.Bootstrap
             follow.smoothTime = cameraSmoothTime;
             follow.offset = cameraOffset;
 
+            // slow-mo zoom + corner vignette; retargeted to each level's gun
+            slowMoFx = cam.gameObject.AddComponent<SlowMoCameraFx>();
+
             builtCamera = cam;
         }
 
@@ -200,9 +211,10 @@ namespace OneButtonSubmission.Bootstrap
             ApplyAtmosphere(lv.ambient, lv.skyBottom, lv.skyTop);
             TintArchitecture(lv);
 
-            // the gun IS the player. It enters by bursting out of the right
-            // tower's glass, already airborne — there is no floor to rest on.
-            var gun = BuildGunPlayer(new Vector3(lv.wallRight - 1.4f, lv.burstHeight, 0f), lv.gun);
+            // the gun IS the player. It enters by bursting out of the entry
+            // tower's glass (right tower on climb levels, left tower's
+            // roofline on descent levels), already airborne — no floor.
+            var gun = BuildGunPlayer(new Vector3(EntryX(lv), lv.burstHeight, 0f), lv.gun);
             gun.transform.SetParent(levelRoot.transform, true);
             var gunRb = gun.GetComponent<Rigidbody>();
             bool intro = pendingIntro && index == 0;
@@ -220,6 +232,9 @@ namespace OneButtonSubmission.Bootstrap
             // summit: landing anywhere on the final shelf wins; the flag is a beacon
             Parent(BuildSummit(lv, lv.shelves[lv.shelves.Length - 1], manager, hud));
             BuildNeonArrow(lv, levelRoot.transform);
+            BuildGlassPanes(lv, levelRoot.transform);   // before shooters: lanes raycast the panes
+            BuildHazardSigns(lv, levelRoot.transform);
+            BuildShooters(lv, levelRoot.transform);     // after geometry: fire lanes raycast the walls
 
             // parallax ridges
             float[] factors = { 0.60f, 0.75f, 0.88f };
@@ -263,6 +278,7 @@ namespace OneButtonSubmission.Bootstrap
             }
             hud.ammo = ammo;
             hud.gun = gun;
+            slowMoFx.gun = gun;
             hud.levelNumber = index + 1;
             hud.bannerText = "";
             manager.ResetWin();
@@ -278,6 +294,80 @@ namespace OneButtonSubmission.Bootstrap
         }
 
         void Parent(GameObject go) => go.transform.SetParent(levelRoot.transform, true);
+
+        /// Breakable panes: a pale glowing sheet of glass with dark frame
+        /// caps. Solid until a player bullet (or a missile blast) shatters
+        /// it — the demolition toll booth.
+        void BuildGlassPanes(LevelConfig lv, Transform parent)
+        {
+            if (lv.glassPanes == null) return;
+            var paneMat = MaterialFactory.Emissive(
+                new Color(0.45f, 0.72f, 0.92f), new Color(0.45f, 0.72f, 0.92f), 0.7f, 0.8f);
+            var frameMat = MaterialFactory.Lit(new Color(0.08f, 0.08f, 0.11f), 0.5f, 0.5f);
+            foreach (var p in lv.glassPanes)
+            {
+                var pane = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                pane.name = "GlassBarrier";
+                pane.transform.position = new Vector3(p.cx, p.cy, 0f);
+                pane.transform.localScale = new Vector3(p.w, p.h, 0.5f);
+                pane.GetComponent<MeshRenderer>().sharedMaterial = paneMat;
+                pane.AddComponent<GlassBarrier>();
+                pane.transform.SetParent(parent, true);
+
+                // frame caps so the pane reads as built, not floating
+                Visual(PrimitiveType.Cube, parent,
+                    new Vector3(p.cx, p.cy + p.h * 0.5f + 0.15f, 0f),
+                    new Vector3(p.w + 0.5f, 0.3f, 0.7f), frameMat, "PaneCap");
+                Visual(PrimitiveType.Cube, parent,
+                    new Vector3(p.cx, p.cy - p.h * 0.5f - 0.15f, 0f),
+                    new Vector3(p.w + 0.5f, 0.3f, 0.7f), frameMat, "PaneCap");
+            }
+        }
+
+        /// Hangs the destructible neon signs; one bullet cuts a sign loose
+        /// and gravity does the demolition.
+        void BuildHazardSigns(LevelConfig lv, Transform parent)
+        {
+            if (lv.hazardSigns == null) return;
+            foreach (var pos in lv.hazardSigns)
+            {
+                var go = new GameObject("HazardSign");
+                go.transform.position = new Vector3(pos.x, pos.y, 0f);
+                var sign = go.AddComponent<HazardSign>();
+                sign.hud = hud;
+                sign.onRetry = () => BuildLevel(currentLevel);
+                sign.Build();
+                go.transform.SetParent(parent, true);
+            }
+        }
+
+        /// Posts the shooting enemies on their shelves: gunners (fixed fire
+        /// lane) from level 5, rocketeers (homing missiles) from level 7.
+        /// They face into the canyon, guarding the crossing arcs.
+        void BuildShooters(LevelConfig lv, Transform parent)
+        {
+            SpawnShooters(lv, lv.gunnerShelves, ShooterEnemy.Kind.Gunner, parent);
+            SpawnShooters(lv, lv.rocketeerShelves, ShooterEnemy.Kind.Rocketeer, parent);
+        }
+
+        void SpawnShooters(LevelConfig lv, int[] shelves, ShooterEnemy.Kind kind, Transform parent)
+        {
+            if (shelves == null || lv.shelves == null) return;
+            foreach (int shelfIndex in shelves)
+            {
+                if (shelfIndex < 0 || shelfIndex >= lv.shelves.Length) continue;
+                var s = lv.shelves[shelfIndex];
+                var go = new GameObject(kind.ToString());
+                go.transform.position = new Vector3(s.cx, s.cy + s.h * 0.5f, 0f);
+                var enemy = go.AddComponent<ShooterEnemy>();
+                enemy.kind = kind;
+                enemy.facing = s.cx > 0f ? -1f : 1f; // guard the open canyon
+                enemy.hud = hud;
+                enemy.onRetry = () => BuildLevel(currentLevel);
+                enemy.Build();
+                go.transform.SetParent(parent, true);
+            }
+        }
 
         /// Club-style sign mounted mid-level (beside the middle building),
         /// its arrow rotated to point the way toward Bond — a hint, not a
@@ -299,17 +389,24 @@ namespace OneButtonSubmission.Bootstrap
             sign.transform.SetParent(parent, true);
         }
 
-        /// The standard level entry: the gun smashes out of the right tower's
-        /// window, already flying. Also the handoff point after the intro, so
-        /// the kinematic -> dynamic switch is done strictly in order: wake the
-        /// body first, teleport in physics space, THEN write the velocities —
-        /// otherwise the launch impulse can be swallowed by the transition and
-        /// the gun drops straight into the void.
+        /// X where the gun spawns, just inside the entry tower's glass.
+        float EntryX(LevelConfig lv)
+            => lv.enterFromLeft ? lv.wallLeft + 1.4f : lv.wallRight - 1.4f;
+
+        /// The standard level entry: the gun smashes out of the entry tower's
+        /// window, already flying (into the canyon — leftward from the right
+        /// tower on climb levels, rightward from the left tower on descent
+        /// levels). Also the handoff point after the intro, so the kinematic
+        /// -> dynamic switch is done strictly in order: wake the body first,
+        /// teleport in physics space, THEN write the velocities — otherwise
+        /// the launch impulse can be swallowed by the transition and the gun
+        /// drops straight into the void.
         void LaunchEntry(GunController gun)
         {
             var lv = levels[currentLevel];
             var rb = gun.GetComponent<Rigidbody>();
-            Vector3 spawn = new Vector3(lv.wallRight - 1.4f, lv.burstHeight, 0f);
+            float into = lv.enterFromLeft ? 1f : -1f; // direction into the canyon
+            Vector3 spawn = new Vector3(EntryX(lv), lv.burstHeight, 0f);
 
             rb.isKinematic = false;
             rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
@@ -317,12 +414,14 @@ namespace OneButtonSubmission.Bootstrap
             rb.position = spawn;
             rb.rotation = Quaternion.identity;
             rb.WakeUp();
-            rb.linearVelocity = new Vector3(-12f, 3.5f, 0f);
-            rb.maxAngularVelocity = 22f;                   // entry-only headroom...
-            rb.angularVelocity = new Vector3(0f, 0f, 18f); // ...to burst out spinning hard
+            rb.linearVelocity = new Vector3(12f * into, 3.5f, 0f);
+            rb.maxAngularVelocity = 22f;                          // entry-only headroom...
+            rb.angularVelocity = new Vector3(0f, 0f, -18f * into); // ...to burst out spinning hard
             gun.enabled = true;
-            GlassBurst.Spawn(new Vector3(lv.wallRight - 0.4f, lv.burstHeight, 0f),
-                Vector3.left, backgroundSeed ^ currentLevel);
+            float glassX = lv.enterFromLeft ? lv.wallLeft + 0.4f : lv.wallRight - 0.4f;
+            GlassBurst.Spawn(new Vector3(glassX, lv.burstHeight, 0f),
+                Vector3.right * into, backgroundSeed ^ currentLevel);
+            AudioManager.Play(AudioManager.Sfx.WindowBreak); // every entry smashes glass
             follow.target = gun.transform;
             follow.SnapToTarget();
         }
@@ -347,11 +446,23 @@ namespace OneButtonSubmission.Bootstrap
             // Level 1 — purple dusk: gold windows + lilac-violet accent
             // Level 2 — midnight blue: teal windows + cobalt accent
             // Level 3 — blood dusk:  amber windows + deep red accent
+            // Level 4 — teal night:  mint windows + sea-green accent
+            // Level 5 — violet night: pink windows + electric-violet accent
+            // Level 6 — pre-dawn:    gold windows + hot orange accent
+            // Level 7 — steel night: ice-blue windows + slate accent
+            // Level 8 — pink dusk:   rose windows + magenta accent
+            // Level 9 — storm violet: gold windows + electric-violet accent
             Color[][] winColors =
             {
                 new[] { new Color(1.00f, 0.80f, 0.28f), new Color(0.60f, 0.35f, 0.90f) }, // L1
                 new[] { new Color(0.28f, 0.90f, 0.95f), new Color(0.25f, 0.45f, 1.00f) }, // L2
                 new[] { new Color(1.00f, 0.65f, 0.20f), new Color(0.90f, 0.22f, 0.22f) }, // L3
+                new[] { new Color(0.45f, 1.00f, 0.75f), new Color(0.20f, 0.80f, 0.60f) }, // L4
+                new[] { new Color(1.00f, 0.45f, 0.85f), new Color(0.55f, 0.30f, 1.00f) }, // L5
+                new[] { new Color(1.00f, 0.85f, 0.40f), new Color(1.00f, 0.55f, 0.20f) }, // L6
+                new[] { new Color(0.55f, 0.85f, 0.95f), new Color(0.30f, 0.55f, 0.70f) }, // L7
+                new[] { new Color(1.00f, 0.45f, 0.75f), new Color(0.85f, 0.25f, 0.95f) }, // L8
+                new[] { new Color(1.00f, 0.85f, 0.40f), new Color(0.60f, 0.45f, 1.00f) }, // L9
             };
             
             int li = Mathf.Clamp(levelIndex, 0, winColors.Length - 1);
@@ -406,7 +517,7 @@ namespace OneButtonSubmission.Bootstrap
             if (currentLevel + 1 < levels.Length)
                 StartCoroutine(NextLevelRoutine());
             else
-                hud.bannerText = "YOU CONQUERED THE MOUNTAIN";
+                hud.bannerText = "JAMES BOND SAVED THE DAY!";
         }
 
         IEnumerator NextLevelRoutine()
@@ -738,8 +849,9 @@ namespace OneButtonSubmission.Bootstrap
         /// play space, so they never cover the action.
         void BuildWallTowers(LevelConfig lv, Transform parent)
         {
-            BuildTower(lv, lv.wallLeft, -1f, parent, false);
-            BuildTower(lv, lv.wallRight, +1f, parent, true); // entry side: broken window
+            // the entry side gets the broken window the gun smashed out of
+            BuildTower(lv, lv.wallLeft, -1f, parent, lv.enterFromLeft);
+            BuildTower(lv, lv.wallRight, +1f, parent, !lv.enterFromLeft);
         }
 
         void BuildTower(LevelConfig lv, float wallX, float side, Transform parent, bool entrySide)
@@ -826,40 +938,44 @@ namespace OneButtonSubmission.Bootstrap
             agentLabel.worldYOffset = 7.5f;
             agentGo.transform.SetParent(root.transform, true);
 
-            // the rival: posted on the platform just before the final one —
-            // an obstacle you pass on the way up. He's decorative — reaching
-            // the final shelf always resolves through the real agent below,
-            // never through him.
-            if (lv.villainAtSummit && lv.shelves != null && lv.shelves.Length >= 2)
+            // the rivals: posted on guarded shelves along the route —
+            // obstacles you pass on the way. They're decorative — reaching
+            // the final shelf always resolves through the real agent on the
+            // goal shelf, never through them.
+            if (lv.villainShelves != null && lv.shelves != null)
             {
-                var villainShelf = lv.shelves[lv.shelves.Length - 2];
-                float villainTop = villainShelf.cy + villainShelf.h * 0.5f;
-                var villainGo = new GameObject("Villain");
-                villainGo.transform.position = new Vector3(villainShelf.cx, villainTop, 0f);
-                var villain = villainGo.AddComponent<SummitAgent>();
-                villain.facing = villainShelf.cx > lv.summit.x ? -1f : 1f; // face back toward the summit
-                villain.villain = true;
-                villain.Build();
-                // Floating name tag above the villain
-                var villainLabel = villainGo.AddComponent<CharacterLabel>();
-                villainLabel.labelText = "Bad Guy";
-                villainLabel.worldYOffset = 7.5f;
+                foreach (int shelfIndex in lv.villainShelves)
+                {
+                    if (shelfIndex < 0 || shelfIndex >= lv.shelves.Length) continue;
+                    var villainShelf = lv.shelves[shelfIndex];
+                    float villainTop = villainShelf.cy + villainShelf.h * 0.5f;
+                    var villainGo = new GameObject("Villain");
+                    villainGo.transform.position = new Vector3(villainShelf.cx, villainTop, 0f);
+                    var villain = villainGo.AddComponent<SummitAgent>();
+                    villain.facing = villainShelf.cx > lv.summit.x ? -1f : 1f; // face toward the summit
+                    villain.villain = true;
+                    villain.Build();
+                    // Floating name tag above the villain
+                    var villainLabel = villainGo.AddComponent<CharacterLabel>();
+                    villainLabel.labelText = "Bad Guy";
+                    villainLabel.worldYOffset = 7.5f;
 
-                // The villain root has negative X scale (facing mirror), which makes
-                // BoxCollider complain. Put the trigger on a world-space child so it
-                // always has a clean positive scale regardless of facing direction.
-                var theftGo = new GameObject("VillainBody");
-                theftGo.transform.SetParent(root.transform, false); // world-space, no scale inheritance
-                theftGo.transform.position = new Vector3(villainShelf.cx, villainTop + 3.0f, 0f);
-                var theftBox = theftGo.AddComponent<BoxCollider>();
-                theftBox.size = new Vector3(3.5f, 6.5f, 4f); // wide + tall to catch any trajectory
-                theftBox.isTrigger = true;
-                var theft = theftGo.AddComponent<VillainTrigger>();
-                theft.villain = villain;
-                theft.hud = hud;
-                theft.onRetry = () => BuildLevel(currentLevel);
+                    // The villain root has negative X scale (facing mirror), which makes
+                    // BoxCollider complain. Put the trigger on a world-space child so it
+                    // always has a clean positive scale regardless of facing direction.
+                    var theftGo = new GameObject("VillainBody");
+                    theftGo.transform.SetParent(root.transform, false); // world-space, no scale inheritance
+                    theftGo.transform.position = new Vector3(villainShelf.cx, villainTop + 3.0f, 0f);
+                    var theftBox = theftGo.AddComponent<BoxCollider>();
+                    theftBox.size = new Vector3(3.5f, 6.5f, 4f); // wide + tall to catch any trajectory
+                    theftBox.isTrigger = true;
+                    var theft = theftGo.AddComponent<VillainTrigger>();
+                    theft.villain = villain;
+                    theft.hud = hud;
+                    theft.onRetry = () => BuildLevel(currentLevel);
 
-                villainGo.transform.SetParent(root.transform, true);
+                    villainGo.transform.SetParent(root.transform, true);
+                }
             }
 
             // win volume: the airspace over the entire final shelf, so any
@@ -896,7 +1012,26 @@ namespace OneButtonSubmission.Bootstrap
             emission.enabled = false;
             ps.Stop();
 
-            gun.OnFired += () => ps.Emit(12);
+            // lingering smoke puffs behind the flash
+            var smokeGo = new GameObject("MuzzleSmoke");
+            smokeGo.transform.SetParent(parent, false);
+            smokeGo.transform.localPosition = new Vector3(0.88f, 0.12f, 0f);
+            var smoke = smokeGo.AddComponent<ParticleSystem>();
+            var sMain = smoke.main;
+            sMain.playOnAwake = false;
+            sMain.startLifetime = 0.7f;
+            sMain.startSpeed = 1.6f;
+            sMain.startSize = 0.45f;
+            sMain.startColor = new Color(0.60f, 0.60f, 0.62f, 0.35f);
+            var sEmission = smoke.emission;
+            sEmission.enabled = false;
+            smoke.Stop();
+
+            gun.OnFired += () =>
+            {
+                ps.Emit(12);
+                smoke.Emit(6);
+            };
         }
     }
 }

@@ -40,6 +40,20 @@ namespace OneButtonSubmission.Components
             villain.StartCutscene(body, ShowRetry, fullEscape: false);
         }
 
+        /// A bullet found him first: no theft, he blows apart downrange and
+        /// this trigger goes dead — the route is clear. Returns false when
+        /// there was nothing left to kill (already dead or mid-steal), so
+        /// the shooter doesn't collect a bounty twice.
+        public bool KillVillain(Vector3 hitDir)
+        {
+            if (consumed) return false;
+            consumed = true;
+            var box = GetComponent<Collider>();
+            if (box != null) box.enabled = false;
+            if (villain != null) villain.Die(hitDir);
+            return true;
+        }
+
         void ShowRetry()
         {
             if (hud == null) return;

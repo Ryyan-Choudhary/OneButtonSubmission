@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using OneButtonSubmission.Art;
+using OneButtonSubmission.Audio;
 
 namespace OneButtonSubmission.Components
 {
@@ -10,10 +11,17 @@ namespace OneButtonSubmission.Components
     /// overhead, then turns his back and bolts with it.
     public class SummitAgent : MonoBehaviour
     {
+        /// Every hostile reads differently at a glance: the melee rival in
+        /// his white suit, the gunner in a brown trench coat and flat cap
+        /// with a drawn pistol, the rocketeer in olive fatigues with a flak
+        /// vest, helmet, and shoulder tube. Auto maps the old bool flags.
+        public enum Wardrobe { Auto, Suit, Shirtsleeves, WhiteSuit, TrenchCoat, HeavyGear }
+
         public float facing = 1f; // +1 faces right, -1 faces left
         public float scale = 3.2f; // whole-rig size multiplier (~5.6 units tall)
         public bool villain;  // steals the gun instead of firing it
         public bool sidekick; // shirtsleeves, no hat — the quartermaster look
+        public Wardrobe wardrobe = Wardrobe.Auto;
 
         const float Tick = 0.13f; // one animation "frame"
 
@@ -31,11 +39,35 @@ namespace OneButtonSubmission.Components
 
         public void Build()
         {
-            // agent: black suit / white shirt / black tie
-            // villain: white suit / dark shirt / red tie
-            Color suitCol  = villain ? new Color(0.88f, 0.86f, 0.82f) : new Color(0.07f, 0.07f, 0.09f);
-            Color shirtCol = villain ? new Color(0.10f, 0.10f, 0.12f) : new Color(0.90f, 0.90f, 0.92f);
-            Color tieCol   = villain ? new Color(0.72f, 0.10f, 0.08f) : new Color(0.07f, 0.07f, 0.09f);
+            var look = wardrobe != Wardrobe.Auto ? wardrobe
+                     : sidekick ? Wardrobe.Shirtsleeves
+                     : villain ? Wardrobe.WhiteSuit
+                     : Wardrobe.Suit;
+
+            Color suitCol, shirtCol, tieCol;
+            switch (look)
+            {
+                case Wardrobe.WhiteSuit:  // the rival: white suit, red tie
+                    suitCol  = new Color(0.88f, 0.86f, 0.82f);
+                    shirtCol = new Color(0.10f, 0.10f, 0.12f);
+                    tieCol   = new Color(0.72f, 0.10f, 0.08f);
+                    break;
+                case Wardrobe.TrenchCoat: // the gunner: brown coat, amber tie
+                    suitCol  = new Color(0.34f, 0.28f, 0.20f);
+                    shirtCol = new Color(0.10f, 0.10f, 0.12f);
+                    tieCol   = new Color(0.85f, 0.55f, 0.18f);
+                    break;
+                case Wardrobe.HeavyGear:  // the rocketeer: olive fatigues, maroon vest
+                    suitCol  = new Color(0.28f, 0.30f, 0.20f);
+                    shirtCol = new Color(0.14f, 0.12f, 0.10f);
+                    tieCol   = new Color(0.45f, 0.10f, 0.08f);
+                    break;
+                default:                  // Bond & the quartermaster: black suit, white shirt
+                    suitCol  = new Color(0.07f, 0.07f, 0.09f);
+                    shirtCol = new Color(0.90f, 0.90f, 0.92f);
+                    tieCol   = new Color(0.07f, 0.07f, 0.09f);
+                    break;
+            }
             suitMat  = MaterialFactory.Lit(suitCol, 0.35f);
             shirtMat = MaterialFactory.Lit(shirtCol, 0.3f);
             tieMat   = MaterialFactory.Lit(tieCol, 0.3f);
@@ -49,11 +81,11 @@ namespace OneButtonSubmission.Components
             legR = Pivot("LegR", new Vector3(0.11f, 0.5f, 0f));
             Box(legR, new Vector3(0f, -0.25f, 0f), new Vector3(0.18f, 0.5f, 0.18f), suitMat, "Shin");
 
-            // sidekick: torso and sleeves in shirt-white (jacket left at home)
-            Material topMat = sidekick ? shirtMat : suitMat;
+            // shirtsleeves: torso and sleeves in shirt-white (jacket left at home)
+            Material topMat = look == Wardrobe.Shirtsleeves ? shirtMat : suitMat;
             torso = Pivot("Torso", new Vector3(0f, 0.83f, 0f));
             Box(torso, Vector3.zero, new Vector3(0.5f, 0.65f, 0.3f), topMat, "Jacket");
-            if (!sidekick)
+            if (look != Wardrobe.Shirtsleeves)
                 Box(torso, new Vector3(0f, 0.1f, -0.16f), new Vector3(0.16f, 0.34f, 0.05f), shirtMat, "Shirt");
             Box(torso, new Vector3(0f, 0.06f, -0.19f), new Vector3(0.07f, 0.28f, 0.04f), tieMat, "Tie");
 
@@ -71,10 +103,27 @@ namespace OneButtonSubmission.Components
             Box(head, new Vector3( 0.08f, 0.04f, -0.15f), new Vector3(0.11f, 0.08f, 0.05f), glassMat, "LensR");
             Box(head, new Vector3(-0.08f, 0.04f, -0.15f), new Vector3(0.11f, 0.08f, 0.05f), glassMat, "LensL");
             Box(head, new Vector3( 0f,    0.04f, -0.15f), new Vector3(0.05f, 0.03f, 0.05f), glassMat, "Bridge");
-            if (!sidekick)
+            if (look == Wardrobe.Suit || look == Wardrobe.WhiteSuit)
             {
                 Box(head, new Vector3(0f, 0.17f, 0f), new Vector3(0.46f, 0.05f, 0.4f), suitMat, "HatBrim");
                 Box(head, new Vector3(0f, 0.28f, 0f), new Vector3(0.3f, 0.18f, 0.28f), suitMat, "HatCrown");
+            }
+
+            if (look == Wardrobe.TrenchCoat)
+            {
+                // long coat skirt, flat cap, and a drawn pistol on a level arm
+                Box(torso, new Vector3(0f, -0.44f, 0f), new Vector3(0.52f, 0.35f, 0.32f), suitMat, "CoatSkirt");
+                Box(head, new Vector3(0f, 0.19f, 0f), new Vector3(0.34f, 0.10f, 0.32f), suitMat, "FlatCap");
+                Box(armR, new Vector3(0f, -0.68f, 0f), new Vector3(0.10f, 0.30f, 0.09f), glassMat, "Pistol");
+                armR.localRotation = Quaternion.Euler(0f, 0f, 90f); // aiming down his lane
+            }
+            else if (look == Wardrobe.HeavyGear)
+            {
+                // flak vest, helmet, and the launcher tube on his shoulder
+                Box(torso, new Vector3(0f, 0.02f, 0f), new Vector3(0.56f, 0.50f, 0.36f), tieMat, "FlakVest");
+                Box(head, new Vector3(0f, 0.16f, 0f), new Vector3(0.36f, 0.22f, 0.34f), suitMat, "Helmet");
+                Box(torso, new Vector3(0.10f, 0.72f, 0.12f), new Vector3(1.15f, 0.16f, 0.16f), glassMat, "LauncherTube");
+                Box(torso, new Vector3(0.42f, 0.72f, 0.12f), new Vector3(0.10f, 0.20f, 0.20f), tieMat, "TubeBand");
             }
 
             // mirror the whole rig to face the canyon, blown up to hero size
@@ -130,6 +179,7 @@ namespace OneButtonSubmission.Components
 
         IEnumerator KneelAndFire(Transform gun, Quaternion aimRot)
         {
+            AudioManager.Play(AudioManager.Sfx.Victory);
             var hold = new WaitForSeconds(Tick);
 
             // drop to one knee, two-hand aim
@@ -149,6 +199,7 @@ namespace OneButtonSubmission.Components
                 armL.localRotation = Quaternion.Euler(0f, 0f, 82f);
                 SpawnFlash(gun);
                 SpawnTracer(gun);
+                AudioManager.Play(AudioManager.Sfx.Gunshot);
                 yield return hold;
 
                 gun.SetPositionAndRotation(aimPos, aimRot);
@@ -159,8 +210,28 @@ namespace OneButtonSubmission.Components
             }
         }
 
+        /// Shot by the player's bullet: the whole rig blows apart into
+        /// ragdoll gibs carried by the shot's direction, with a blood spray
+        /// at the wound and droplet trails off the bigger chunks — Happy
+        /// Wheels slapstick. Does nothing if a cutscene already owns him
+        /// (mid-steal he's untouchable).
+        public void Die(Vector3 hitDir)
+        {
+            if (started) return;
+            started = true;
+            AudioManager.Play(AudioManager.Sfx.OhNo);
+
+            var rng = new System.Random(GetInstanceID());
+            var parts = GetComponentsInChildren<MeshRenderer>();
+            for (int i = 0; i < parts.Length; i++)
+                Gib.Spawn(parts[i], hitDir, rng, bleeds: i % 3 == 0);
+            BloodFx.Burst(transform.position + Vector3.up * (scale * 0.8f), hitDir);
+            Destroy(gameObject);
+        }
+
         IEnumerator StealAndBrandish(Transform gun)
         {
+            AudioManager.Play(AudioManager.Sfx.OhNo);
             var hold = new WaitForSeconds(Tick);
 
             armR.localRotation = Quaternion.Euler(0f, 0f, 180f);

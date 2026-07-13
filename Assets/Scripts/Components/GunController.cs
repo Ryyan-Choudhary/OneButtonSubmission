@@ -1,15 +1,17 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using OneButtonSubmission.Core;
+using OneButtonSubmission.Audio;
 
 namespace OneButtonSubmission.Components
 {
-    /// The one-button heart. Z (or gamepad right-trigger) is the only input:
-    ///   - PRESS   -> fire immediately; recoil launches and spins the gun
-    ///   - HOLD    -> bullet time (slow-mo) to watch the tumble
-    ///   - RELEASE -> aimed follow-up shot (slightly stronger)
+    /// The one-button heart. Z (or gamepad right-trigger) is the only input,
+    /// and every shot happens on RELEASE — a press alone never spends a shell:
+    ///   - TAP  (release before the hold threshold) -> fire; recoil launches
+    ///   - HOLD (past the threshold) -> bullet time (slow-mo) to aim the tumble
+    ///   - RELEASE from bullet time -> aimed shot (slightly stronger)
     /// There is no aim arrow: the gun's physical rotation IS the aim, so
-    /// mid-air shots are timed against the tumble.
+    /// shots are timed against the tumble.
     public class GunController : MonoBehaviour
     {
         [Header("Wiring (set by bootstrap)")]
@@ -67,10 +69,11 @@ namespace OneButtonSubmission.Components
 
         void OnPress(InputAction.CallbackContext ctx)
         {
+            // no shot yet — a press can still become a slow-mo hold, and
+            // firing here would waste the shell before we know which it is
             holding = true;
             enteredBT = false;
             pressTime = Time.unscaledTime;
-            FireShot(false); // shoot the instant the button goes down
         }
 
         void OnRelease(InputAction.CallbackContext ctx)
@@ -82,6 +85,10 @@ namespace OneButtonSubmission.Components
                 FireShot(true); // the aimed shot, timed against the slow tumble
                 ExitBulletTime();
                 enteredBT = false;
+            }
+            else
+            {
+                FireShot(false); // quick tap: the snap shot happens on release
             }
         }
 
@@ -125,6 +132,13 @@ namespace OneButtonSubmission.Components
                     config.jumpBoost * mult),
                 config.spinImpulse * mult, config.opposingCancel);
             fireGate.RegisterFire(now);
+
+            // the slug itself: flies out of the muzzle opposite the recoil
+            float rad = body.BarrelAngleDeg * Mathf.Deg2Rad;
+            Vector3 muzzleDir = new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f);
+            Bullet.Spawn(transform.TransformPoint(0.82f, 0.12f, 0f), muzzleDir, transform);
+
+            AudioManager.Play(AudioManager.Sfx.Gunshot);
             OnFired?.Invoke();
             return true;
         }
@@ -137,6 +151,10 @@ namespace OneButtonSubmission.Components
 
         void ExitBulletTime()
         {
+            // spend the meter: without this the Active phase kept draining
+            // invisibly after an early release (and the HUD bar, now only
+            // shown while active, would linger). No-op if already spent.
+            bulletTime?.Deactivate();
             Time.timeScale = 1f;
             Time.fixedDeltaTime = baseFixedDelta;
         }
