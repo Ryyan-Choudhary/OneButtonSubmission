@@ -34,8 +34,9 @@ namespace OneButtonSubmission.Bootstrap
         int currentLevel;
 
         // persistent materials
-        Material rockMat, groundMat;
         Material gunMetalMat, gunWoodMat, muzzleMat, ammoMat, laserMat;
+        Material facadeMat, windowWarmMat, windowCoolMat, windowGlassMat, brokenMat;
+        Material balconyMat, railMat;
         PhysicsMaterial gunPhysMat;
 
         // persistent rig
@@ -51,7 +52,7 @@ namespace OneButtonSubmission.Bootstrap
 
         void Awake()
         {
-            levels = new[] { LevelConfig.Foothills(), LevelConfig.TheSpire(), LevelConfig.TheDoubleCross() };
+            levels = new[] { LevelConfig.Level1(), LevelConfig.Level2(), LevelConfig.Level3() };
 
             BuildMaterials();
             BuildLights();
@@ -65,7 +66,13 @@ namespace OneButtonSubmission.Bootstrap
             TitleFlow.Create(this);
         }
 
-        public void BeginGame() => BuildLevel(0);
+        bool pendingIntro;
+
+        public void BeginGame()
+        {
+            pendingIntro = true; // the suitcase cutscene plays once, not on retries
+            BuildLevel(0);
+        }
 
         public Camera TitleCamera => builtCamera;
 
@@ -80,13 +87,21 @@ namespace OneButtonSubmission.Bootstrap
 
         void BuildMaterials()
         {
-            rockMat     = MaterialFactory.Lit(Palette.Rock, 0.12f);
-            groundMat   = MaterialFactory.Lit(Palette.Ground, 0.10f);
             gunMetalMat = MaterialFactory.Lit(Palette.GunMetal, 0.45f, 0.6f);
             gunWoodMat  = MaterialFactory.Lit(Palette.GunWood, 0.25f);
             muzzleMat   = MaterialFactory.Emissive(Palette.Muzzle, Palette.Muzzle, 2.0f);
             ammoMat     = MaterialFactory.Emissive(Palette.Ammo, Palette.Ammo, 1.6f);
             laserMat    = MaterialFactory.Unlit(Palette.Laser);
+
+            // the flanking towers: in-focus facade (unlike the hazy skyline),
+            // lit windows in the game's warm/cool accents, dark glass panes
+            facadeMat      = MaterialFactory.Lit(new Color(0.13f, 0.13f, 0.19f), 0.25f);
+            windowWarmMat  = MaterialFactory.Emissive(new Color(1f, 0.72f, 0.25f), new Color(1f, 0.72f, 0.25f), 1.3f);
+            windowCoolMat  = MaterialFactory.Emissive(new Color(0.30f, 0.75f, 1f), new Color(0.30f, 0.75f, 1f), 1.1f);
+            windowGlassMat = MaterialFactory.Lit(new Color(0.10f, 0.14f, 0.20f), 0.9f, 0.6f);
+            brokenMat      = MaterialFactory.Unlit(new Color(0.02f, 0.02f, 0.03f));
+            balconyMat     = MaterialFactory.Lit(new Color(0.20f, 0.20f, 0.26f), 0.2f);  // concrete slab
+            railMat        = MaterialFactory.Lit(new Color(0.08f, 0.08f, 0.11f), 0.5f, 0.5f); // dark metal
 
             // landing feel: bounce + skitter instead of a dead stop
             gunPhysMat = new PhysicsMaterial("GunClatter")
@@ -178,22 +193,21 @@ namespace OneButtonSubmission.Bootstrap
 
             Physics.gravity = new Vector3(0f, lv.gravityY, 0f);
             ApplyAtmosphere(lv.ambient, lv.skyBottom, lv.skyTop);
+            TintArchitecture(lv);
 
-            // the gun IS the player: a free-tumbling rigidbody, no character
-            var gun = BuildGunPlayer(new Vector3(lv.startPos.x, lv.startPos.y, 0f), lv.gun);
+            // the gun IS the player. It enters by bursting out of the right
+            // tower's glass, already airborne — there is no floor to rest on.
+            var gun = BuildGunPlayer(new Vector3(lv.wallRight - 1.4f, lv.burstHeight, 0f), lv.gun);
             gun.transform.SetParent(levelRoot.transform, true);
+            var gunRb = gun.GetComponent<Rigidbody>();
+            bool intro = pendingIntro && index == 0;
+            pendingIntro = false;
 
-            // terrain: the ground spans exactly wall-to-wall, so the arena
-            // edge is where the world visibly ends
-            float midX = (lv.wallLeft + lv.wallRight) * 0.5f;
-            var ground = BuildGround(new Vector3(midX, -0.5f, 0f),
-                new Vector3(lv.wallRight - lv.wallLeft, 1f, 4f));
-            ground.transform.SetParent(levelRoot.transform, true);
-            BuildShelves(lv.shelves, levelRoot.transform);
-            BuildBounds(lv, levelRoot.transform);
+            // terrain: balconies over a fatal drop — no floor
+            BuildShelves(lv, levelRoot.transform);
+            BuildWallTowers(lv, levelRoot.transform);
+            BuildRoof(lv, levelRoot.transform);
 
-            // pickups (one near the start plus the route ones)
-            Parent(BuildAmmoPickup(new Vector3(lv.startPos.x + 3f, lv.startPos.y - 1f, 0f)));
             if (lv.routePickups != null)
                 foreach (var p in lv.routePickups)
                     Parent(BuildAmmoPickup(new Vector3(p.x, p.y, 0f)));
@@ -218,22 +232,83 @@ namespace OneButtonSubmission.Bootstrap
             BuildCityLayers(index, levelRoot.transform);
 
             // retarget persistent systems onto the new content
-            follow.target = gun.transform;
+            follow.minY = 3f; // the camera never chases the gun into the drop
+            if (intro)
+            {
+                // the suitcase cutscene owns the gun and camera until it
+                // hands over via LaunchEntry. Continuous CD is illegal on
+                // kinematic bodies, so drop to speculative for the ride.
+                gunRb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                gunRb.isKinematic = true;
+                gun.enabled = false;
+                var cin = new GameObject("Level1Intro").AddComponent<Level1Intro>();
+                cin.gun = gun;
+                cin.follow = follow;
+                cin.cam = builtCamera;
+                cin.wallRight = lv.wallRight;
+                cin.burstHeight = lv.burstHeight;
+                cin.seed = backgroundSeed;
+                cin.onLaunch = () => LaunchEntry(gun);
+                cin.BuildAndPlay();
+            }
+            else
+            {
+                LaunchEntry(gun);
+            }
             hud.ammo = ammo;
             hud.gun = gun;
             hud.levelNumber = index + 1;
             hud.bannerText = "";
             manager.ResetWin();
 
-            // softlock watchdog: still + out of shells for 2s -> offer retry
+            // retry watchdog: stuck with no shells, or fallen out of the world
             var retry = gun.gameObject.AddComponent<StuckRetry>();
-            retry.body = gun.GetComponent<Rigidbody>();
+            retry.body = gunRb;
             retry.ammo = ammo;
             retry.hud = hud;
+            retry.gun = gun;
+            retry.fallY = -12f;
             retry.onRetry = () => BuildLevel(currentLevel);
         }
 
         void Parent(GameObject go) => go.transform.SetParent(levelRoot.transform, true);
+
+        /// The standard level entry: the gun smashes out of the right tower's
+        /// window, already flying. Also the handoff point after the intro, so
+        /// the kinematic -> dynamic switch is done strictly in order: wake the
+        /// body first, teleport in physics space, THEN write the velocities —
+        /// otherwise the launch impulse can be swallowed by the transition and
+        /// the gun drops straight into the void.
+        void LaunchEntry(GunController gun)
+        {
+            var lv = levels[currentLevel];
+            var rb = gun.GetComponent<Rigidbody>();
+            Vector3 spawn = new Vector3(lv.wallRight - 1.4f, lv.burstHeight, 0f);
+
+            rb.isKinematic = false;
+            rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+            gun.transform.SetPositionAndRotation(spawn, Quaternion.identity);
+            rb.position = spawn;
+            rb.rotation = Quaternion.identity;
+            rb.WakeUp();
+            rb.linearVelocity = new Vector3(-12f, 3.5f, 0f);
+            rb.angularVelocity = new Vector3(0f, 0f, 6f);
+            gun.enabled = true;
+            GlassBurst.Spawn(new Vector3(lv.wallRight - 0.4f, lv.burstHeight, 0f),
+                Vector3.left, backgroundSeed ^ currentLevel);
+            follow.target = gun.transform;
+            follow.SnapToTarget();
+        }
+
+        /// Nudges the tower/balcony palette toward the level's sky so the
+        /// architecture sits in the same light as the backdrop.
+        void TintArchitecture(LevelConfig lv)
+        {
+            facadeMat.color      = Color.Lerp(new Color(0.13f, 0.13f, 0.19f), lv.skyBottom, 0.35f);
+            balconyMat.color     = Color.Lerp(new Color(0.20f, 0.20f, 0.26f), lv.skyBottom, 0.30f);
+            windowGlassMat.color = Color.Lerp(new Color(0.10f, 0.14f, 0.20f), lv.skyBottom, 0.40f);
+            railMat.color        = Color.Lerp(new Color(0.08f, 0.08f, 0.11f), lv.skyBottom, 0.25f);
+        }
 
         /// Adds two procedural city skyline layers (far + mid) behind the mountain ridges.
         void BuildCityLayers(int levelIndex, Transform parent)
@@ -398,16 +473,6 @@ namespace OneButtonSubmission.Bootstrap
             return gun;
         }
 
-        GameObject BuildGround(Vector3 pos, Vector3 size)
-        {
-            var ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            ground.name = "Ground";
-            ground.transform.position = pos;
-            ground.transform.localScale = size;
-            ground.GetComponent<MeshRenderer>().sharedMaterial = groundMat;
-            return ground;
-        }
-
         GameObject BuildRidge(int index, float depth, Material mat)
         {
             var go = new GameObject($"Ridge_{index}");
@@ -500,40 +565,208 @@ namespace OneButtonSubmission.Bootstrap
             return go;
         }
 
-        void BuildShelves(LevelConfig.Shelf[] shelves, Transform parent)
+        /// Every landing surface is a balcony now. Wall-touching shelves jut
+        /// sideways from the flanking towers (rails on the open end + front);
+        /// floating shelves get rails on both ends and a backing building
+        /// behind the play plane, so they read as balconies ON that building.
+        /// The physics slab is unchanged — rails and towers are cosmetic.
+        void BuildShelves(LevelConfig lv, Transform parent)
         {
-            if (shelves == null) return;
-            foreach (var s in shelves)
+            if (lv.shelves == null) return;
+            var floaters = new List<LevelConfig.Shelf>();
+            foreach (var s in lv.shelves)
             {
-                var shelf = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                shelf.name = "Shelf";
-                shelf.transform.position = new Vector3(s.cx, s.cy, 0f);
-                shelf.transform.localScale = new Vector3(s.w, s.h, 4f);
-                shelf.transform.SetParent(parent, true);
-                shelf.GetComponent<MeshRenderer>().sharedMaterial = rockMat;
+                var slab = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                slab.name = "Balcony";
+                slab.transform.position = new Vector3(s.cx, s.cy, 0f);
+                slab.transform.localScale = new Vector3(s.w, s.h, 4f);
+                slab.transform.SetParent(parent, true);
+                slab.GetComponent<MeshRenderer>().sharedMaterial = balconyMat;
+
+                int attach = s.cx - s.w / 2f <= lv.wallLeft + 0.6f ? -1
+                           : s.cx + s.w / 2f >= lv.wallRight - 0.6f ? 1 : 0;
+                BuildRails(s, attach, parent);
+                if (attach == 0) floaters.Add(s);
+            }
+            BuildBackingTowers(lv, floaters, parent);
+        }
+
+        void BuildRails(LevelConfig.Shelf s, int attach, Transform parent)
+        {
+            float top = s.cy + s.h * 0.5f;
+            float xL = s.cx - s.w / 2f, xR = s.cx + s.w / 2f;
+
+            // front edge (camera side) always has a rail
+            RailRun(new Vector3(xL, top, -1.86f), s.w, true, parent);
+            // open ends get rails; the tower-attached end does not
+            if (attach != -1) RailRun(new Vector3(xL + 0.1f, top, -1.86f), 3.72f, false, parent);
+            if (attach != 1) RailRun(new Vector3(xR - 0.1f, top, -1.86f), 3.72f, false, parent);
+        }
+
+        /// A straight railing: top bar, mid bar, and evenly spaced posts.
+        void RailRun(Vector3 start, float length, bool alongX, Transform parent)
+        {
+            const float railH = 1.0f;
+            Vector3 dir = alongX ? Vector3.right : Vector3.forward;
+            Vector3 mid = start + dir * (length * 0.5f);
+            Vector3 barScale = alongX
+                ? new Vector3(length, 0.09f, 0.09f)
+                : new Vector3(0.09f, 0.09f, length);
+
+            Visual(PrimitiveType.Cube, parent, mid + Vector3.up * railH, barScale, railMat, "RailTop");
+            Visual(PrimitiveType.Cube, parent, mid + Vector3.up * (railH * 0.55f), barScale, railMat, "RailMid");
+
+            int posts = Mathf.Max(2, Mathf.RoundToInt(length / 1.6f) + 1);
+            float step = length / (posts - 1);
+            for (int i = 0; i < posts; i++)
+                Visual(PrimitiveType.Cube, parent,
+                    start + dir * (i * step) + Vector3.up * (railH * 0.5f),
+                    new Vector3(0.07f, railH, 0.07f), railMat, "RailPost");
+        }
+
+        /// One building behind each cluster of floating balconies. Neighboring
+        /// balconies share a building (the center stone ladder becomes one
+        /// mid-rise with a balcony per floor); a lone low pad becomes the
+        /// rooftop terrace of a short building rising from the drop.
+        void BuildBackingTowers(LevelConfig lv, List<LevelConfig.Shelf> floaters, Transform parent)
+        {
+            if (floaters.Count == 0) return;
+            floaters.Sort((a, b) => (a.cx - a.w / 2f).CompareTo(b.cx - b.w / 2f));
+
+            var cluster = new List<LevelConfig.Shelf> { floaters[0] };
+            float clusterRight = floaters[0].cx + floaters[0].w / 2f;
+            for (int i = 1; i <= floaters.Count; i++)
+            {
+                bool flush = i == floaters.Count
+                    || floaters[i].cx - floaters[i].w / 2f > clusterRight + 3f;
+                if (!flush)
+                {
+                    cluster.Add(floaters[i]);
+                    clusterRight = Mathf.Max(clusterRight, floaters[i].cx + floaters[i].w / 2f);
+                    continue;
+                }
+
+                BuildBackingTower(lv, cluster, parent);
+                if (i < floaters.Count)
+                {
+                    cluster = new List<LevelConfig.Shelf> { floaters[i] };
+                    clusterRight = floaters[i].cx + floaters[i].w / 2f;
+                }
             }
         }
 
-        /// Invisible colliders boxing the arena in: left/right walls + roof.
-        /// The gun's bouncy material means these double as bounce surfaces,
-        /// and the laser visibly stops on them so players can read the edge.
-        void BuildBounds(LevelConfig lv, Transform parent)
+        void BuildBackingTower(LevelConfig lv, List<LevelConfig.Shelf> cluster, Transform parent)
         {
-            float midX = (lv.wallLeft + lv.wallRight) * 0.5f;
-            MakeWall("WallLeft", new Vector3(lv.wallLeft - 0.5f, lv.ceiling * 0.5f, 0f),
-                new Vector3(1f, lv.ceiling + 40f, 6f), parent);
-            MakeWall("WallRight", new Vector3(lv.wallRight + 0.5f, lv.ceiling * 0.5f, 0f),
-                new Vector3(1f, lv.ceiling + 40f, 6f), parent);
-            MakeWall("Roof", new Vector3(midX, lv.ceiling + 0.5f, 0f),
-                new Vector3(lv.wallRight - lv.wallLeft + 2f, 1f, 6f), parent);
+            float xMin = float.MaxValue, xMax = float.MinValue, topShelf = float.MinValue;
+            foreach (var s in cluster)
+            {
+                xMin = Mathf.Min(xMin, s.cx - s.w / 2f);
+                xMax = Mathf.Max(xMax, s.cx + s.w / 2f);
+                topShelf = Mathf.Max(topShelf, s.cy + s.h / 2f);
+            }
+            xMin -= 2f; xMax += 2f;
+            float bottom = -34f, top = topShelf + 2.5f; // parapet just above the highest balcony
+
+            var slab = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            slab.name = "BackTower";
+            slab.transform.position = new Vector3((xMin + xMax) * 0.5f, (bottom + top) * 0.5f, 6.2f);
+            slab.transform.localScale = new Vector3(xMax - xMin, top - bottom, 8f);
+            slab.GetComponent<MeshRenderer>().sharedMaterial = facadeMat;
+            slab.transform.SetParent(parent, true);
+
+            // a lit door behind each balcony, window grid everywhere else
+            foreach (var s in cluster)
+                Visual(PrimitiveType.Cube, parent,
+                    new Vector3(s.cx, s.cy + s.h / 2f + 1.15f, 2.16f),
+                    new Vector3(1.6f, 2.3f, 0.08f), windowWarmMat, "BalconyDoor");
+
+            var rng = new System.Random(backgroundSeed ^ (int)(xMin * 17f));
+            for (float y = -6f; y <= top - 2.5f; y += 4f)
+            {
+                for (float x = xMin + 2f; x <= xMax - 2f; x += 3.5f)
+                {
+                    bool nearDoor = false;
+                    foreach (var s in cluster)
+                        if (Mathf.Abs(x - s.cx) < 2f && Mathf.Abs(y - (s.cy + s.h / 2f + 1.15f)) < 2.4f)
+                            nearDoor = true;
+                    if (nearDoor) continue;
+                    PlaceWindow(new Vector3(x, y, 2.14f), new Vector3(1.5f, 1.6f, 0.08f), rng, parent);
+                }
+            }
         }
 
-        void MakeWall(string name, Vector3 pos, Vector3 size, Transform parent)
+        /// The arena's side walls are real skyscrapers now: solid, in-focus
+        /// towers whose inner faces sit exactly where the old invisible walls
+        /// were. The gun bounces off them, the laser lands on them, and the
+        /// balcony shelves visually jut out of their facades. They flank the
+        /// play space, so they never cover the action.
+        void BuildWallTowers(LevelConfig lv, Transform parent)
         {
-            var go = new GameObject(name);
-            go.transform.position = pos;
+            BuildTower(lv, lv.wallLeft, -1f, parent, false);
+            BuildTower(lv, lv.wallRight, +1f, parent, true); // entry side: broken window
+        }
+
+        void BuildTower(LevelConfig lv, float wallX, float side, Transform parent, bool entrySide)
+        {
+            float bottom = -34f, top = lv.ceiling + 16f;
+            var slab = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            slab.name = side > 0f ? "TowerRight" : "TowerLeft";
+            slab.transform.position = new Vector3(wallX + side * 4f, (bottom + top) * 0.5f, 2f);
+            slab.transform.localScale = new Vector3(8f, top - bottom, 8f);
+            slab.GetComponent<MeshRenderer>().sharedMaterial = facadeMat;
+            slab.transform.SetParent(parent, true);
+
+            // windows over the play band: a mix of lit (warm/cool) and dark
+            // glass, on the inner face and the camera-facing face
+            var rng = new System.Random(backgroundSeed ^ (int)(wallX * 31f));
+            for (float y = -6f; y <= lv.ceiling + 4f; y += 4f)
+            {
+                PlaceWindow(new Vector3(wallX - side * 0.09f, y, -0.4f),
+                    new Vector3(0.08f, 1.6f, 1.5f), rng, parent);
+                PlaceWindow(new Vector3(wallX - side * 0.09f, y, 2.4f),
+                    new Vector3(0.08f, 1.6f, 1.5f), rng, parent);
+                PlaceWindow(new Vector3(wallX + side * 2f, y, -2.05f),
+                    new Vector3(1.5f, 1.6f, 0.08f), rng, parent);
+                PlaceWindow(new Vector3(wallX + side * 5.6f, y, -2.05f),
+                    new Vector3(1.5f, 1.6f, 0.08f), rng, parent);
+            }
+
+            // the hole the gun smashed out of
+            if (entrySide)
+            {
+                var hole = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                hole.name = "BrokenWindow";
+                Destroy(hole.GetComponent<Collider>());
+                hole.transform.position = new Vector3(wallX - side * 0.06f, lv.burstHeight, 0f);
+                hole.transform.localScale = new Vector3(0.12f, 2.3f, 2.3f);
+                hole.GetComponent<MeshRenderer>().sharedMaterial = brokenMat;
+                hole.transform.SetParent(parent, true);
+            }
+        }
+
+        void PlaceWindow(Vector3 pos, Vector3 size, System.Random rng, Transform parent)
+        {
+            double roll = rng.NextDouble();
+            Material mat = roll < 0.28 ? windowWarmMat
+                         : roll < 0.48 ? windowCoolMat
+                         : windowGlassMat;
+            var w = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            w.name = "Window";
+            Destroy(w.GetComponent<Collider>());
+            w.transform.position = pos;
+            w.transform.localScale = size;
+            w.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            w.transform.SetParent(parent, true);
+        }
+
+        /// Only the roof stays invisible — the sides are towers, the bottom is a drop.
+        void BuildRoof(LevelConfig lv, Transform parent)
+        {
+            var go = new GameObject("Roof");
+            go.transform.position = new Vector3(
+                (lv.wallLeft + lv.wallRight) * 0.5f, lv.ceiling + 0.5f, 0f);
             var box = go.AddComponent<BoxCollider>();
-            box.size = size;
+            box.size = new Vector3(lv.wallRight - lv.wallLeft + 18f, 1f, 8f);
             go.transform.SetParent(parent, true);
         }
 

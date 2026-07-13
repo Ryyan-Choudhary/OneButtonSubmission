@@ -28,7 +28,6 @@ namespace OneButtonSubmission.Components
         bool holding;
         bool enteredBT;
         float pressTime;
-        bool firstShotDone; // the level-opening shot launches straight up
 
         public event System.Action OnFired;
 
@@ -56,7 +55,6 @@ namespace OneButtonSubmission.Components
             config = cfg;
             fireGate = new FireGate(cfg.fireCooldown);
             bulletTime = new BulletTimeState(cfg.bulletTimeDuration, cfg.bulletTimeCooldown);
-            firstShotDone = false;
         }
 
         void OnEnable() => fireAction?.Enable();
@@ -122,14 +120,10 @@ namespace OneButtonSubmission.Components
             if (ammo != null) ammo.System.TryConsume();
 
             float mult = precise ? config.preciseMultiplier : 1f;
-            // the level's opening shot is a clean vertical serve: straight up,
-            // spin included, so the player starts airborne and aiming
-            Vector2 impulse = firstShotDone
-                ? RecoilCalculator.Impulse(body.BarrelAngleDeg, config.recoilForce * mult,
-                    config.jumpBoost * mult)
-                : Vector2.up * config.recoilForce;
-            firstShotDone = true;
-            body.ApplyRecoil(impulse, config.spinImpulse * mult, config.opposingCancel);
+            body.ApplyRecoil(
+                RecoilCalculator.Impulse(body.BarrelAngleDeg, config.recoilForce * mult,
+                    config.jumpBoost * mult),
+                config.spinImpulse * mult, config.opposingCancel);
             fireGate.RegisterFire(now);
             OnFired?.Invoke();
             return true;

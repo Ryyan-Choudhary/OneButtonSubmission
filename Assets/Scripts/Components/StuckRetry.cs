@@ -3,22 +3,28 @@ using UnityEngine.InputSystem;
 
 namespace OneButtonSubmission.Components
 {
-    /// Softlock watchdog: with zero shells the gun cannot move, so if it sits
-    /// still for a few seconds with an empty tank, offer a retry. Z restarts
-    /// the current level. The prompt hides itself if ammo appears (e.g. a
-    /// pickup respawns into the gun).
+    /// Retry watchdog, two fail states:
+    ///  1. Stuck — zero shells + sitting still: the gun cannot move at all.
+    ///  2. Fallen — dropped below the world (there is no floor); the camera
+    ///     stays put while the gun disappears off-screen.
+    /// Either way: "RETRY ?" and Z restarts the level. The stuck prompt hides
+    /// itself if ammo appears (e.g. a pickup respawns into the gun); a fall is
+    /// latched and always ends in a retry.
     public class StuckRetry : MonoBehaviour
     {
         public Rigidbody body;
         public AmmoSystemBehaviour ammo;
         public HudController hud;
+        public GunController gun;
         public System.Action onRetry;
 
         public float stillSeconds = 2f;
         public float speedThreshold = 0.6f;
+        public float fallY = -12f;
 
         float stillTimer;
         bool prompting;
+        bool fallen;
         InputAction retryAction;
 
         void Awake()
@@ -40,6 +46,13 @@ namespace OneButtonSubmission.Components
         {
             if (body == null || ammo == null || hud == null) return;
 
+            // fell out of the world: latch it, cut the controls, let it drop
+            if (!fallen && !body.isKinematic && body.position.y < fallY)
+            {
+                fallen = true;
+                if (gun != null) gun.enabled = false;
+            }
+
             // kinematic = the summit cutscene took over; never prompt there
             bool stuck = !body.isKinematic
                 && ammo.System != null && ammo.System.IsEmpty
@@ -47,7 +60,7 @@ namespace OneButtonSubmission.Components
                 && Mathf.Abs(body.angularVelocity.z) < 1f;
 
             stillTimer = stuck ? stillTimer + Time.deltaTime : 0f;
-            bool shouldPrompt = stillTimer >= stillSeconds;
+            bool shouldPrompt = fallen || stillTimer >= stillSeconds;
             if (shouldPrompt == prompting) return;
 
             prompting = shouldPrompt;

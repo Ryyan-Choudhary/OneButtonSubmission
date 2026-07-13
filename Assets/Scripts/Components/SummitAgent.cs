@@ -12,13 +12,22 @@ namespace OneButtonSubmission.Components
     {
         public float facing = 1f; // +1 faces right, -1 faces left
         public float scale = 3.2f; // whole-rig size multiplier (~5.6 units tall)
-        public bool villain; // steals the gun instead of firing it
+        public bool villain;  // steals the gun instead of firing it
+        public bool sidekick; // shirtsleeves, no hat — the quartermaster look
 
         const float Tick = 0.13f; // one animation "frame"
 
         Transform torso, head, armL, armR, legL, legR;
         Material suitMat, shirtMat, tieMat, skinMat, glassMat, flashMat;
         bool started;
+
+        // joint access for external puppeteering (intro cutscene)
+        public Transform TorsoPivot => torso;
+        public Transform HeadPivot => head;
+        public Transform ArmLPivot => armL;
+        public Transform ArmRPivot => armR;
+        public Transform LegLPivot => legL;
+        public Transform LegRPivot => legR;
 
         public void Build()
         {
@@ -40,15 +49,18 @@ namespace OneButtonSubmission.Components
             legR = Pivot("LegR", new Vector3(0.11f, 0.5f, 0f));
             Box(legR, new Vector3(0f, -0.25f, 0f), new Vector3(0.18f, 0.5f, 0.18f), suitMat, "Shin");
 
+            // sidekick: torso and sleeves in shirt-white (jacket left at home)
+            Material topMat = sidekick ? shirtMat : suitMat;
             torso = Pivot("Torso", new Vector3(0f, 0.83f, 0f));
-            Box(torso, Vector3.zero, new Vector3(0.5f, 0.65f, 0.3f), suitMat, "Jacket");
-            Box(torso, new Vector3(0f, 0.1f, -0.16f), new Vector3(0.16f, 0.34f, 0.05f), shirtMat, "Shirt");
+            Box(torso, Vector3.zero, new Vector3(0.5f, 0.65f, 0.3f), topMat, "Jacket");
+            if (!sidekick)
+                Box(torso, new Vector3(0f, 0.1f, -0.16f), new Vector3(0.16f, 0.34f, 0.05f), shirtMat, "Shirt");
             Box(torso, new Vector3(0f, 0.06f, -0.19f), new Vector3(0.07f, 0.28f, 0.04f), tieMat, "Tie");
 
             armL = Pivot("ArmL", new Vector3(-0.33f, 1.06f, 0f));
-            Box(armL, new Vector3(0f, -0.25f, 0f), new Vector3(0.13f, 0.5f, 0.13f), suitMat, "Sleeve");
+            Box(armL, new Vector3(0f, -0.25f, 0f), new Vector3(0.13f, 0.5f, 0.13f), topMat, "Sleeve");
             armR = Pivot("ArmR", new Vector3(0.33f, 1.06f, 0f));
-            Box(armR, new Vector3(0f, -0.25f, 0f), new Vector3(0.13f, 0.5f, 0.13f), suitMat, "Sleeve");
+            Box(armR, new Vector3(0f, -0.25f, 0f), new Vector3(0.13f, 0.5f, 0.13f), topMat, "Sleeve");
 
             head = Pivot("Head", new Vector3(0f, 1.32f, 0f));
             Box(head, Vector3.zero, new Vector3(0.3f, 0.3f, 0.28f), skinMat, "Skull");
@@ -59,8 +71,11 @@ namespace OneButtonSubmission.Components
             Box(head, new Vector3( 0.08f, 0.04f, -0.15f), new Vector3(0.11f, 0.08f, 0.05f), glassMat, "LensR");
             Box(head, new Vector3(-0.08f, 0.04f, -0.15f), new Vector3(0.11f, 0.08f, 0.05f), glassMat, "LensL");
             Box(head, new Vector3( 0f,    0.04f, -0.15f), new Vector3(0.05f, 0.03f, 0.05f), glassMat, "Bridge");
-            Box(head, new Vector3(0f, 0.17f, 0f), new Vector3(0.46f, 0.05f, 0.4f), suitMat, "HatBrim");
-            Box(head, new Vector3(0f, 0.28f, 0f), new Vector3(0.3f, 0.18f, 0.28f), suitMat, "HatCrown");
+            if (!sidekick)
+            {
+                Box(head, new Vector3(0f, 0.17f, 0f), new Vector3(0.46f, 0.05f, 0.4f), suitMat, "HatBrim");
+                Box(head, new Vector3(0f, 0.28f, 0f), new Vector3(0.3f, 0.18f, 0.28f), suitMat, "HatCrown");
+            }
 
             // mirror the whole rig to face the canyon, blown up to hero size
             transform.localScale = new Vector3(facing * scale, scale, scale);
