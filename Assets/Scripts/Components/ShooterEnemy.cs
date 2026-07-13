@@ -58,7 +58,7 @@ namespace OneButtonSubmission.Components
             var label = gameObject.AddComponent<CharacterLabel>();
             label.labelText = kind == Kind.Gunner ? "Hired Gun"
                             : kind == Kind.Rocketeer ? "Rocket Man"
-                            : "Scarface";
+                            : "Scar";
             label.worldYOffset = 7.5f;
 
             if (kind == Kind.Gunner) BuildFireLane();

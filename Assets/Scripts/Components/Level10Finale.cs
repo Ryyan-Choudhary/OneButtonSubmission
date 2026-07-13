@@ -132,6 +132,8 @@ namespace OneButtonSubmission.Components
             GUI.color = new Color(0f, 0f, 0f, dark);
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), black);
 
+            GUI.color = Color.white;
+
             // text rides ON TOP of the blackout in bright gold/white, only
             // dipping out in the very last instant before the title returns
             float textIn = Mathf.Clamp01((age - FadeIn * 0.5f) / 0.8f);
