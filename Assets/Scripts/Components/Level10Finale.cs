@@ -132,8 +132,10 @@ namespace OneButtonSubmission.Components
             GUI.color = new Color(0f, 0f, 0f, dark);
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), black);
 
+            // text rides ON TOP of the blackout in bright gold/white, only
+            // dipping out in the very last instant before the title returns
             float textIn = Mathf.Clamp01((age - FadeIn * 0.5f) / 0.8f);
-            float textOut = 1f - Mathf.Clamp01((age - FadeIn - Hold - FadeOut * 0.4f) / (FadeOut * 0.6f));
+            float textOut = 1f - Mathf.Clamp01((age - FadeIn - Hold - FadeOut + 0.35f) / 0.35f);
             float a = textIn * textOut;
             if (a > 0f)
             {
@@ -141,11 +143,11 @@ namespace OneButtonSubmission.Components
                 int mid = Mathf.Max(34, Mathf.RoundToInt(Screen.height * 0.042f));
                 int small = Mathf.Max(24, Mathf.RoundToInt(Screen.height * 0.028f));
 
-                Label("MISSION COMPLETE", big, new Color(1f, 0.8f, 0.3f, a),
+                Label("MISSION COMPLETE", big, new Color(1f, 0.85f, 0.25f, a),
                     Screen.height * 0.32f);
-                Label($"FINAL KILLS   {GameStats.Kills}", mid, new Color(0.65f, 0.42f, 0.98f, a),
+                Label($"FINAL KILLS   {GameStats.Kills}", mid, new Color(1f, 1f, 1f, a),
                     Screen.height * 0.47f);
-                Label("the legend has his gun back", small, new Color(0.85f, 0.82f, 0.95f, 0.8f * a),
+                Label("the legend has his gun back", small, new Color(1f, 0.95f, 0.75f, 0.85f * a),
                     Screen.height * 0.58f);
             }
             GUI.color = prev;

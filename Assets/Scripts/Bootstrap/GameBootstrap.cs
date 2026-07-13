@@ -815,14 +815,36 @@ namespace OneButtonSubmission.Bootstrap
             return tex;
         }
 
+        /// A floating ammo crate: wooden box, dark lid, glowing violet straps,
+        /// and a row of shell tips poking out the top.
         GameObject BuildAmmoPickup(Vector3 pos)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            go.name = "AmmoPickup";
+            var go = new GameObject("AmmoPickup");
             go.transform.position = pos;
-            go.transform.localScale = Vector3.one * 0.6f;
-            go.GetComponent<Collider>().isTrigger = true;
-            go.GetComponent<MeshRenderer>().sharedMaterial = ammoMat;
+
+            var box = go.AddComponent<BoxCollider>();
+            box.size = new Vector3(1.1f, 1.0f, 1.1f);
+            box.isTrigger = true;
+
+            var wood = MaterialFactory.Lit(new Color(0.36f, 0.24f, 0.13f), 0.25f);
+            var lid = MaterialFactory.Lit(new Color(0.22f, 0.15f, 0.09f), 0.3f);
+            var brass = MaterialFactory.Emissive(new Color(0.95f, 0.75f, 0.30f),
+                new Color(0.95f, 0.75f, 0.30f), 0.8f);
+
+            Visual(PrimitiveType.Cube, go.transform, new Vector3(0f, -0.05f, 0f),
+                new Vector3(0.9f, 0.62f, 0.62f), wood, "CrateBody");
+            Visual(PrimitiveType.Cube, go.transform, new Vector3(0f, 0.3f, 0f),
+                new Vector3(0.98f, 0.12f, 0.7f), lid, "CrateLid");
+            // glowing straps — same violet identity as the old orbs
+            Visual(PrimitiveType.Cube, go.transform, new Vector3(-0.24f, -0.02f, 0f),
+                new Vector3(0.1f, 0.72f, 0.68f), ammoMat, "StrapL");
+            Visual(PrimitiveType.Cube, go.transform, new Vector3(0.24f, -0.02f, 0f),
+                new Vector3(0.1f, 0.72f, 0.68f), ammoMat, "StrapR");
+            // shell tips peeking out of the lid
+            for (int i = -1; i <= 1; i++)
+                Visual(PrimitiveType.Cube, go.transform, new Vector3(i * 0.22f, 0.44f, 0f),
+                    new Vector3(0.1f, 0.18f, 0.1f), brass, $"Shell{i + 1}");
+
             var pickup = go.AddComponent<AmmoPickup>();
             pickup.amount = pickupRefill;
             go.AddComponent<PickupSpin>();

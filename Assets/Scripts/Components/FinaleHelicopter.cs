@@ -17,9 +17,10 @@ namespace OneButtonSubmission.Components
         float t;
 
         /// Where the boss stands on the rear deck (world space, at build time).
-        public Vector3 BossAnchor => transform.position + new Vector3(1.4f, 0.95f, 0f);
-        /// Where the cage sits, further back on the deck.
-        public Vector3 CageAnchor => transform.position + new Vector3(5.4f, 0.95f, 0f);
+        public Vector3 BossAnchor => transform.position + new Vector3(3.6f, 0.95f, 0f);
+        /// Where the cage sits, at the far end of the deck — well clear of the
+        /// boss so their name labels never overlap on screen.
+        public Vector3 CageAnchor => transform.position + new Vector3(10.6f, 0.95f, 0f);
 
         public void Build()
         {
@@ -31,11 +32,12 @@ namespace OneButtonSubmission.Components
 
             Piece(new Vector3(0f, 0.2f, 0f), new Vector3(5.5f, 2.4f, 2.4f), black, "Fuselage", false);
             Piece(new Vector3(-2.9f, 0.4f, 0f), new Vector3(1.4f, 1.3f, 2.0f), glass, "Cockpit", false);
-            Piece(new Vector3(4.3f, 0.5f, 0f), new Vector3(4.4f, 0.6f, 0.6f), black, "TailBoom", false);
-            Piece(new Vector3(6.4f, 1.3f, 0f), new Vector3(0.3f, 1.5f, 0.3f), black, "TailFin", false);
+            Piece(new Vector3(7.6f, 0.4f, 0f), new Vector3(9.5f, 0.6f, 0.6f), black, "TailBoom", false);
+            Piece(new Vector3(12.4f, 1.3f, 0f), new Vector3(0.3f, 1.5f, 0.3f), black, "TailFin", false);
 
-            // the rear deck the boss stands on — the only solid part
-            Piece(new Vector3(3.6f, 0.75f, 0f), new Vector3(6.6f, 0.35f, 3.4f), black, "RearDeck", true);
+            // the long rear deck — the only solid part; boss up front, cage at
+            // the far end, with room between the two name tags
+            Piece(new Vector3(7.6f, 0.75f, 0f), new Vector3(10f, 0.35f, 3.4f), black, "RearDeck", true);
 
             // skids
             Piece(new Vector3(-0.6f, -1.45f, 0.9f), new Vector3(4.4f, 0.12f, 0.16f), black, "SkidF", false);
@@ -59,11 +61,11 @@ namespace OneButtonSubmission.Components
             // tail rotor spinning in the play plane
             tailRotor = new GameObject("TailRotor").transform;
             tailRotor.SetParent(transform, false);
-            tailRotor.localPosition = new Vector3(6.5f, 1.6f, 0.4f);
+            tailRotor.localPosition = new Vector3(12.6f, 1.6f, 0.4f);
             var tBlade = Piece(Vector3.zero, new Vector3(1.7f, 0.12f, 0.07f), black, "TailBlade", false);
             tBlade.transform.SetParent(tailRotor, false);
 
-            var lightGo = Piece(new Vector3(6.5f, 2.1f, 0f), new Vector3(0.22f, 0.22f, 0.22f), lightOn, "TailLight", false);
+            var lightGo = Piece(new Vector3(12.5f, 2.2f, 0f), new Vector3(0.22f, 0.22f, 0.22f), lightOn, "TailLight", false);
             tailLight = lightGo.GetComponent<MeshRenderer>();
         }
 

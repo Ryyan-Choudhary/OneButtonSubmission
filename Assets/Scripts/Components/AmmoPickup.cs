@@ -12,12 +12,12 @@ namespace OneButtonSubmission.Components
         public int amount = 3;
         public float respawnSeconds = 6f;
 
-        Renderer rend;
+        Renderer[] rends; // the crate is built from child pieces
         Collider col;
 
         void Awake()
         {
-            rend = GetComponent<Renderer>();
+            rends = GetComponentsInChildren<Renderer>();
             col = GetComponent<Collider>();
         }
 
@@ -27,15 +27,17 @@ namespace OneButtonSubmission.Components
             if (ammo == null) return;
             ammo.System.Refill(amount);
             AudioManager.Play(AudioManager.Sfx.Reload);
-            rend.enabled = false;
-            col.enabled = false;
+            SetVisible(false);
             Invoke(nameof(Respawn), respawnSeconds);
         }
 
-        void Respawn()
+        void Respawn() => SetVisible(true);
+
+        void SetVisible(bool on)
         {
-            rend.enabled = true;
-            col.enabled = true;
+            foreach (var r in rends)
+                if (r != null) r.enabled = on;
+            col.enabled = on;
         }
     }
 }
