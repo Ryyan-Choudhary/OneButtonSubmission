@@ -27,7 +27,7 @@ namespace OneButtonSubmission.Components
         public static void Spawn(Vector3 pos, Vector3 dir, ShooterEnemy shooter)
         {
             if (tracerMat == null)
-                tracerMat = MaterialFactory.Emissive(Palette.Laser, Palette.Laser, 2.2f);
+                tracerMat = MaterialFactory.Emissive(Palette.Laser, Palette.Laser, 3.0f);
 
             var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             go.name = "EnemyBullet";
@@ -35,7 +35,7 @@ namespace OneButtonSubmission.Components
             go.GetComponent<MeshRenderer>().sharedMaterial = tracerMat;
             go.transform.position = pos;
             go.transform.rotation = Quaternion.FromToRotation(Vector3.right, dir);
-            go.transform.localScale = new Vector3(0.5f, 0.08f, 0.08f);
+            go.transform.localScale = new Vector3(1.5f, 0.3f, 0.3f); // fat and readable
             go.transform.SetParent(shooter.transform.parent, true); // dies with the level
 
             var b = go.AddComponent<EnemyBullet>();
@@ -104,30 +104,42 @@ namespace OneButtonSubmission.Components
             go.transform.position = pos;
             go.transform.SetParent(shooter.transform.parent, true); // dies with the level
 
-            // body + emissive nose + exhaust glow, in the game's chunky style
-            var bodyMat = MaterialFactory.Lit(new Color(0.30f, 0.32f, 0.28f), 0.4f, 0.4f);
-            var noseMat = MaterialFactory.Emissive(Palette.Laser, Palette.Laser, 2.0f);
-            var burnMat = MaterialFactory.Emissive(Palette.Muzzle, Palette.Muzzle, 2.4f);
+            // red-and-white paint job, self-lit, sized to be unmissable
+            var bodyMat = MaterialFactory.Lit(new Color(0.92f, 0.90f, 0.88f), 0.4f, 0.2f);
+            bodyMat.EnableKeyword("_EMISSION");
+            bodyMat.SetColor("_EmissionColor", new Color(0.92f, 0.90f, 0.88f) * 0.4f);
+            var redMat = MaterialFactory.Emissive(
+                new Color(0.95f, 0.10f, 0.08f), new Color(0.95f, 0.10f, 0.08f), 1.8f);
+            var burnMat = MaterialFactory.Emissive(Palette.Muzzle, Palette.Muzzle, 2.8f);
             Piece(go.transform, PrimitiveType.Cube, new Vector3(0f, 0f, 0f),
-                new Vector3(0.62f, 0.16f, 0.16f), bodyMat, "Body");
-            Piece(go.transform, PrimitiveType.Cube, new Vector3(0.36f, 0f, 0f),
-                new Vector3(0.14f, 0.12f, 0.12f), noseMat, "Nose");
-            Piece(go.transform, PrimitiveType.Cube, new Vector3(-0.36f, 0f, 0f),
-                new Vector3(0.12f, 0.10f, 0.10f), burnMat, "Exhaust");
+                new Vector3(2.0f, 0.5f, 0.5f), bodyMat, "Body");
+            Piece(go.transform, PrimitiveType.Cube, new Vector3(1.15f, 0f, 0f),
+                new Vector3(0.45f, 0.42f, 0.42f), redMat, "Nose");
+            Piece(go.transform, PrimitiveType.Cube, new Vector3(0.1f, 0f, 0f),
+                new Vector3(0.35f, 0.56f, 0.56f), redMat, "Band");
+            Piece(go.transform, PrimitiveType.Cube, new Vector3(-0.85f, 0.35f, 0f),
+                new Vector3(0.5f, 0.22f, 0.16f), redMat, "FinTop");
+            Piece(go.transform, PrimitiveType.Cube, new Vector3(-0.85f, -0.35f, 0f),
+                new Vector3(0.5f, 0.22f, 0.16f), redMat, "FinBottom");
+            Piece(go.transform, PrimitiveType.Cube, new Vector3(-1.15f, 0f, 0f),
+                new Vector3(0.3f, 0.3f, 0.3f), burnMat, "Exhaust");
 
-            // smoke trail
+            // smoke trail: proper soft-particle material so it renders as grey
+            // puffs (an unassigned material would show magenta squares)
             var ps = go.AddComponent<ParticleSystem>();
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
-            main.startLifetime = 0.8f;
+            main.playOnAwake = false;
+            main.startLifetime = 1.0f;
             main.startSpeed = 0.4f;
-            main.startSize = new ParticleSystem.MinMaxCurve(0.15f, 0.3f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.4f, 0.8f);
             main.startColor = new ParticleSystem.MinMaxGradient(
-                new Color(0.7f, 0.7f, 0.7f, 0.5f), new Color(0.45f, 0.45f, 0.48f, 0.4f));
+                new Color(0.66f, 0.66f, 0.68f, 0.55f), new Color(0.42f, 0.42f, 0.45f, 0.45f));
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.scalingMode = ParticleSystemScalingMode.Shape;
             var em = ps.emission;
-            em.rateOverTime = 26f;
+            em.rateOverTime = 32f;
+            go.GetComponent<ParticleSystemRenderer>().material = MaterialFactory.SoftParticle();
             ps.Play();
 
             var m = go.AddComponent<HomingMissile>();
@@ -202,11 +214,9 @@ namespace OneButtonSubmission.Components
                 }
                 if (hit.collider.isTrigger) continue;
 
-                // the blast takes demolition targets with it
+                // the blast takes glass with it
                 var glass = hit.collider.GetComponent<GlassBarrier>();
                 if (glass != null) glass.Shatter(dir);
-                var sign = hit.collider.GetComponentInParent<HazardSign>();
-                if (sign != null) sign.Drop(dir);
 
                 Explode(hit.point); // walls, balconies — anything solid
                 return;

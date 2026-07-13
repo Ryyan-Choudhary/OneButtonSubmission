@@ -85,5 +85,30 @@ namespace OneButtonSubmission.Art
             m.mainTexture = tex;
             return m;
         }
+
+        static Material softParticle;
+
+        /// Alpha-blended particle material with a soft radial-gradient dot,
+        /// so smoke/dust renders as round puffs instead of magenta squares.
+        public static Material SoftParticle()
+        {
+            if (softParticle != null) return softParticle;
+
+            const int size = 64;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float c = (size - 1) * 0.5f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c)) / c;
+                    float a = Mathf.Clamp01(1f - d);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
+                }
+            tex.Apply();
+
+            softParticle = new Material(Shader.Find("Legacy Shaders/Particles/Alpha Blended"));
+            softParticle.mainTexture = tex;
+            return softParticle;
+        }
     }
 }

@@ -233,7 +233,6 @@ namespace OneButtonSubmission.Bootstrap
             Parent(BuildSummit(lv, lv.shelves[lv.shelves.Length - 1], manager, hud));
             BuildNeonArrow(lv, levelRoot.transform);
             BuildGlassPanes(lv, levelRoot.transform);   // before shooters: lanes raycast the panes
-            BuildHazardSigns(lv, levelRoot.transform);
             BuildShooters(lv, levelRoot.transform);     // after geometry: fire lanes raycast the walls
 
             // parallax ridges
@@ -321,23 +320,6 @@ namespace OneButtonSubmission.Bootstrap
                 Visual(PrimitiveType.Cube, parent,
                     new Vector3(p.cx, p.cy - p.h * 0.5f - 0.15f, 0f),
                     new Vector3(p.w + 0.5f, 0.3f, 0.7f), frameMat, "PaneCap");
-            }
-        }
-
-        /// Hangs the destructible neon signs; one bullet cuts a sign loose
-        /// and gravity does the demolition.
-        void BuildHazardSigns(LevelConfig lv, Transform parent)
-        {
-            if (lv.hazardSigns == null) return;
-            foreach (var pos in lv.hazardSigns)
-            {
-                var go = new GameObject("HazardSign");
-                go.transform.position = new Vector3(pos.x, pos.y, 0f);
-                var sign = go.AddComponent<HazardSign>();
-                sign.hud = hud;
-                sign.onRetry = () => BuildLevel(currentLevel);
-                sign.Build();
-                go.transform.SetParent(parent, true);
             }
         }
 

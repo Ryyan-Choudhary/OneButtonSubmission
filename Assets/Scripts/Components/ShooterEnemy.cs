@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using OneButtonSubmission.Art;
 using OneButtonSubmission.Audio;
@@ -27,7 +28,9 @@ namespace OneButtonSubmission.Components
         bool dead;
         float cooldown;
 
-        float FireInterval => kind == Kind.Gunner ? 2.4f : 4.6f;
+        // the rocketeer's cycle is shorter because each launch now spends
+        // ~1s on the lock-on telegraph first — net cadence is unchanged
+        float FireInterval => kind == Kind.Gunner ? 2.4f : 3.6f;
 
         public void Build()
         {
@@ -111,11 +114,27 @@ namespace OneButtonSubmission.Components
             }
             else
             {
-                // up and out of the tube; the homing does the rest
-                Vector3 launchDir = new Vector3(facing, 0.9f, 0f).normalized;
-                HomingMissile.Spawn(MuzzlePos(), launchDir, this);
-                AudioManager.Play(AudioManager.Sfx.Gunshot);
+                StartCoroutine(LockOnAndFire());
             }
+        }
+
+        /// Missile-lock telegraph: a red reticle clamps onto the player's gun,
+        /// a beep sounds, and one second later the rocket flies. Fair warning.
+        IEnumerator LockOnAndFire()
+        {
+            var gunBody = Object.FindFirstObjectByType<GunBody>();
+            if (gunBody == null) yield break;
+
+            var reticle = LockOnReticle.Attach(gunBody.transform);
+            AudioManager.Play(AudioManager.Sfx.LockBeep);
+            yield return new WaitForSeconds(1.0f);
+            if (reticle != null) Destroy(reticle.gameObject);
+            if (dead) yield break;
+
+            // up and out of the tube; the homing does the rest
+            Vector3 launchDir = new Vector3(facing, 0.9f, 0f).normalized;
+            HomingMissile.Spawn(MuzzlePos(), launchDir, this);
+            AudioManager.Play(AudioManager.Sfx.Gunshot);
         }
 
         /// Same exit as the melee rival: gibs downrange, blood, gone.
@@ -141,5 +160,70 @@ namespace OneButtonSubmission.Components
     public class EnemyHitBox : MonoBehaviour
     {
         public ShooterEnemy owner;
+    }
+
+    /// The missile-lock warning: a red circle-and-crosshair reticle that
+    /// clamps onto the gun, snaps down to size, and slowly spins. Destroyed
+    /// by the rocketeer when the missile launches (or times out on its own
+    /// if the rocketeer died mid-lock).
+    public class LockOnReticle : MonoBehaviour
+    {
+        Transform target;
+        float age;
+
+        public static LockOnReticle Attach(Transform target)
+        {
+            var go = new GameObject("LockOnReticle");
+            var r = go.AddComponent<LockOnReticle>();
+            r.target = target;
+            r.BuildVisual();
+            return r;
+        }
+
+        void BuildVisual()
+        {
+            var mat = MaterialFactory.Emissive(
+                new Color(1f, 0.15f, 0.10f), new Color(1f, 0.15f, 0.10f), 2.6f);
+
+            // the circle: a ring of tangent segments
+            const int segs = 12;
+            const float radius = 1.7f;
+            for (int i = 0; i < segs; i++)
+            {
+                float a = i * Mathf.PI * 2f / segs;
+                var p = Piece(new Vector3(Mathf.Cos(a) * radius, Mathf.Sin(a) * radius, 0f),
+                    new Vector3(0.5f, 0.11f, 0.08f), mat, $"Ring{i}");
+                p.transform.localRotation = Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg + 90f);
+            }
+            // the cross
+            Piece(Vector3.zero, new Vector3(2.6f, 0.08f, 0.08f), mat, "CrossH");
+            Piece(Vector3.zero, new Vector3(0.08f, 2.6f, 0.08f), mat, "CrossV");
+        }
+
+        GameObject Piece(Vector3 lpos, Vector3 scale, Material mat, string name)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            Destroy(go.GetComponent<Collider>());
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = lpos;
+            go.transform.localScale = scale;
+            go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            return go;
+        }
+
+        void LateUpdate()
+        {
+            age += Time.deltaTime;
+            if (target == null || age > 1.6f) // orphan safety
+            {
+                Destroy(gameObject);
+                return;
+            }
+            transform.position = target.position;
+            float snap = Mathf.Lerp(1.9f, 1f, Mathf.Clamp01(age / 0.4f));
+            transform.localScale = Vector3.one * snap;
+            transform.rotation = Quaternion.Euler(0f, 0f, age * 80f);
+        }
     }
 }

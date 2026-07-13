@@ -52,15 +52,15 @@ namespace OneButtonSubmission.Components
                     shirtCol = new Color(0.10f, 0.10f, 0.12f);
                     tieCol   = new Color(0.72f, 0.10f, 0.08f);
                     break;
-                case Wardrobe.TrenchCoat: // the gunner: brown coat, amber tie
-                    suitCol  = new Color(0.34f, 0.28f, 0.20f);
+                case Wardrobe.TrenchCoat: // the gunner: proper brown suit, amber tie
+                    suitCol  = new Color(0.45f, 0.30f, 0.16f);
                     shirtCol = new Color(0.10f, 0.10f, 0.12f);
                     tieCol   = new Color(0.85f, 0.55f, 0.18f);
                     break;
-                case Wardrobe.HeavyGear:  // the rocketeer: olive fatigues, maroon vest
-                    suitCol  = new Color(0.28f, 0.30f, 0.20f);
+                case Wardrobe.HeavyGear:  // the rocketeer: bright white fatigues, hot red vest
+                    suitCol  = new Color(0.97f, 0.96f, 0.94f);
                     shirtCol = new Color(0.14f, 0.12f, 0.10f);
-                    tieCol   = new Color(0.45f, 0.10f, 0.08f);
+                    tieCol   = new Color(0.95f, 0.10f, 0.08f);
                     break;
                 default:                  // Bond & the quartermaster: black suit, white shirt
                     suitCol  = new Color(0.07f, 0.07f, 0.09f);
@@ -71,6 +71,14 @@ namespace OneButtonSubmission.Components
             suitMat  = MaterialFactory.Lit(suitCol, 0.35f);
             shirtMat = MaterialFactory.Lit(shirtCol, 0.3f);
             tieMat   = MaterialFactory.Lit(tieCol, 0.3f);
+            if (look == Wardrobe.HeavyGear)
+            {
+                // self-lit so the red-and-white pops against any sky
+                suitMat.EnableKeyword("_EMISSION");
+                suitMat.SetColor("_EmissionColor", suitCol * 0.35f);
+                tieMat.EnableKeyword("_EMISSION");
+                tieMat.SetColor("_EmissionColor", tieCol * 0.6f);
+            }
             skinMat  = MaterialFactory.Lit(new Color(0.85f, 0.62f, 0.45f), 0.2f);
             glassMat = MaterialFactory.Lit(new Color(0.03f, 0.03f, 0.04f), 0.8f, 0.5f);
             flashMat = MaterialFactory.Emissive(Palette.Muzzle, Palette.Muzzle, 2.5f);

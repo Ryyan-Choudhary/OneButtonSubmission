@@ -16,10 +16,9 @@ namespace OneButtonSubmission.Bootstrap
     /// Levels 1-3 CLIMB: entry low out of the right tower, goal at the top.
     /// Levels 4-6 DESCEND: entry high out of the LEFT tower's roofline, goal
     /// at street level — gravity is an ally now, control is the challenge.
-    /// Levels 7-9 DEMOLITION: glass panes wall off arcs (shoot to open),
-    /// neon signs hang over hostiles (shoot to drop them as crushing
-    /// hazards), and rocketeers join the gunners. Shooting the world is
-    /// now as important as shooting for thrust.
+    /// Levels 7-9 DEMOLITION: glass panes wall off arcs (shoot to open)
+    /// and rocketeers join the gunners. Shooting the world is now as
+    /// important as shooting for thrust.
     [System.Serializable]
     public class LevelConfig
     {
@@ -53,7 +52,6 @@ namespace OneButtonSubmission.Bootstrap
         public int[] gunnerShelves;      // shelf indices with a gunner firing a fixed lane (levels 5+)
         public int[] rocketeerShelves;   // shelf indices with a homing-missile rocketeer (levels 7+)
         public Shelf[] glassPanes;       // breakable panes blocking routes (levels 5+)
-        public Vector2[] hazardSigns;    // neon signs that drop as hazards when shot (levels 7+)
 
         /// Level 1: gentle rises (+6), wide balconies, a full center ladder of
         /// stones. Entry arc drops the gun onto the catch pad untouched, so
@@ -338,12 +336,6 @@ namespace OneButtonSubmission.Bootstrap
                 new Shelf(-16f, 16f, 0.5f, 9f), // blocks the balcony-to-stone arc
                 new Shelf(-24f, 33f, 0.5f, 9f), // blocks the final approach
             },
-            hazardSigns = new[]
-            {
-                new Vector2( 42f, 31f),   // over the gunner's balcony
-                new Vector2( -4f, 37f),   // over the rocketeer's stone
-                new Vector2(  6f, 25.5f), // over the rival's stone
-            },
             routePickups = new[]
             {
                 new Vector2( 30f,  4.5f),
@@ -359,9 +351,9 @@ namespace OneButtonSubmission.Bootstrap
         };
 
         /// Level 8: descent through a pink neon dusk — gunner lanes off both
-        /// wall balconies, a rocketeer squatting mid-route, and signs hung
-        /// exactly where a falling one does the most good. Missiles chasing
-        /// you down a canyon full of glass is the level's whole argument.
+        /// wall balconies and a rocketeer squatting mid-route. Missiles
+        /// chasing you down a canyon full of glass is the level's whole
+        /// argument.
         public static LevelConfig Level8() => new LevelConfig
         {
             name = "Level 8",
@@ -392,12 +384,6 @@ namespace OneButtonSubmission.Bootstrap
             {
                 new Shelf( 24f, 25f,   0.5f, 9f), // over the arc down to the gunner's balcony
                 new Shelf(-26f, 12.5f, 0.5f, 9f), // between rocketeer and the left balcony
-            },
-            hazardSigns = new[]
-            {
-                new Vector2( 46f, 29.5f), // over the right-balcony gunner
-                new Vector2( -2f, 23f),   // over the rocketeer
-                new Vector2( 10f, 12f),   // over the rival
             },
             routePickups = new[]
             {
@@ -447,13 +433,6 @@ namespace OneButtonSubmission.Bootstrap
                 new Shelf(-28f, 10f,   0.5f, 9f),  // stone-to-balcony arc
                 new Shelf( 28f, 22.5f, 0.5f, 9f),  // rival-to-rocketeer arc
                 new Shelf(-24f, 41f,   0.5f, 10f), // the last pane before the summit
-            },
-            hazardSigns = new[]
-            {
-                new Vector2(-50f, 20.5f), // over the low gunner
-                new Vector2( 50f, 33f),   // over the first rocketeer
-                new Vector2( -6f, 39f),   // over the high gunner
-                new Vector2(-50f, 45.5f), // over the second rocketeer
             },
             routePickups = new[]
             {

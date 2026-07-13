@@ -9,7 +9,7 @@ namespace OneButtonSubmission.Audio
     /// Assets/Resources/Sfx/ using the exact names below.
     public static class AudioManager
     {
-        public enum Sfx { Gunshot, WindowBreak, Explosion, Reload, OhNo, Victory, GunFlying }
+        public enum Sfx { Gunshot, WindowBreak, Explosion, Reload, OhNo, Victory, GunFlying, LockBeep }
 
         static readonly Dictionary<Sfx, string> ClipNames = new Dictionary<Sfx, string>
         {
@@ -66,6 +66,31 @@ namespace OneButtonSubmission.Audio
             if (themeClip == null)
                 Debug.LogWarning("AudioManager: missing clip 'Sfx/theme' — " +
                     "put theme.mp3 under Assets/Resources/Sfx/.");
+
+            clips[Sfx.LockBeep] = MakeLockBeep(); // procedural: no mp3 needed
+        }
+
+        /// A short two-pip missile-lock beep, synthesized so it ships with
+        /// the code instead of the Resources folder.
+        static AudioClip MakeLockBeep()
+        {
+            const int rate = 44100;
+            const float pip = 0.09f, gap = 0.06f, freq = 1174.7f; // D6
+            int n = (int)(rate * (pip * 2f + gap));
+            var data = new float[n];
+            for (int i = 0; i < n; i++)
+            {
+                float t = (float)i / rate;
+                float local = t < pip ? t
+                            : t >= pip + gap ? t - pip - gap
+                            : -1f;
+                if (local < 0f) continue;
+                float env = Mathf.Sin(Mathf.PI * (local / pip)); // smooth pip
+                data[i] = Mathf.Sin(2f * Mathf.PI * freq * t) * 0.45f * env;
+            }
+            var clip = AudioClip.Create("lock_beep", n, 1, rate, false);
+            clip.SetData(data, 0);
+            return clip;
         }
 
         /// One-shot SFX. Safe to call rapidly — PlayOneShot stacks overlapping calls.

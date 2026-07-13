@@ -74,20 +74,12 @@ namespace OneButtonSubmission.Components
                 }
                 if (hit.collider.isTrigger) continue; // pickups, win volume: pass through
 
-                // demolition targets: a shell spent on glass opens the route,
-                // one spent on a neon sign drops it on whoever's underneath
+                // demolition: a shell spent on glass opens the route
                 var glass = hit.collider.GetComponent<GlassBarrier>();
                 if (glass != null)
                 {
                     glass.Shatter(dir);
                     Destroy(gameObject);
-                    return;
-                }
-                var sign = hit.collider.GetComponentInParent<HazardSign>();
-                if (sign != null)
-                {
-                    sign.Drop(dir);
-                    Impact(hit.point);
                     return;
                 }
                 Impact(hit.point);
