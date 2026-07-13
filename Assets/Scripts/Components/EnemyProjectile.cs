@@ -233,6 +233,84 @@ namespace OneButtonSubmission.Components
         }
     }
 
+    /// One pellet of the boss's spread shot: a fat glowing violet ball that
+    /// sags slowly under light gravity, so the fan rains down the canyon.
+    /// Destroys the player's gun on contact, shatters glass, and puffs out
+    /// on anything solid. Raycast-stepped so it can't tunnel.
+    public class EnemyPellet : MonoBehaviour
+    {
+        const float Gravity = -3.5f;
+        const float Life = 6f;
+
+        static Material pelletMat;
+
+        Transform shooterRoot;
+        HudController hud;
+        System.Action onRetry;
+        Vector3 vel;
+        float age;
+
+        public static void Spawn(Vector3 pos, Vector3 dir, float speed, ShooterEnemy shooter)
+        {
+            if (pelletMat == null)
+                pelletMat = MaterialFactory.Emissive(
+                    new Color(0.80f, 0.30f, 1f), new Color(0.80f, 0.30f, 1f), 2.6f);
+
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = "EnemyPellet";
+            Destroy(go.GetComponent<Collider>());
+            go.GetComponent<MeshRenderer>().sharedMaterial = pelletMat;
+            go.transform.position = pos;
+            go.transform.localScale = Vector3.one * 0.55f;
+            go.transform.SetParent(shooter.transform.parent, true); // dies with the level
+
+            var p = go.AddComponent<EnemyPellet>();
+            p.vel = dir.normalized * speed;
+            p.shooterRoot = shooter.transform;
+            p.hud = shooter.hud;
+            p.onRetry = shooter.onRetry;
+        }
+
+        void Update()
+        {
+            age += Time.deltaTime;
+            if (age >= Life)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            vel.y += Gravity * Time.deltaTime; // the slow sag
+            Vector3 step = vel * Time.deltaTime;
+            var hits = Physics.RaycastAll(transform.position, step.normalized, step.magnitude,
+                ~0, QueryTriggerInteraction.Collide);
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            foreach (var hit in hits)
+            {
+                if (shooterRoot != null && hit.collider.transform.IsChildOf(shooterRoot)) continue;
+
+                var body = hit.collider.GetComponentInParent<GunBody>();
+                if (body != null)
+                {
+                    GunDeath.TryKill(body, hud, onRetry);
+                    Destroy(gameObject);
+                    return;
+                }
+                if (hit.collider.isTrigger) continue;
+
+                var glass = hit.collider.GetComponent<GlassBarrier>();
+                if (glass != null) glass.Shatter(vel.normalized);
+
+                GlassBurst.Spawn(hit.point, -vel.normalized,
+                    (int)(hit.point.x * 53f + hit.point.y * 7f),
+                    new Color(0.80f, 0.30f, 1f), new Color(0.30f, 0.20f, 0.38f), 5);
+                Destroy(gameObject);
+                return;
+            }
+            transform.position += step;
+        }
+    }
+
     /// The player's gun getting destroyed by enemy fire: one big amber
     /// burst, the gun is gone, and the same Z-to-retry prompt as every
     /// other death. Refuses while a cutscene owns the gun (its controller

@@ -51,6 +51,7 @@ namespace OneButtonSubmission.Bootstrap
         public int[] villainShelves;     // shelf indices with a melee rival squatting on them
         public int[] gunnerShelves;      // shelf indices with a gunner firing a fixed lane (levels 5+)
         public int[] rocketeerShelves;   // shelf indices with a homing-missile rocketeer (levels 7+)
+        public bool bossFinale;          // level 10: helicopter, caged Bond, and the boss
         public Shelf[] glassPanes;       // breakable panes blocking routes (levels 5+)
 
         /// Level 1: gentle rises (+6), wide balconies, a full center ladder of
@@ -447,6 +448,75 @@ namespace OneButtonSubmission.Bootstrap
             },
             summit = new Vector2(0f, 45.5f),
             signPos = new Vector2(16f, 26f), // right flank of the middle building
+        };
+
+        /// Level 10 — THE FINAL CLIMB. Bond is caged on a black helicopter
+        /// hovering at the very top, guarded by the purple-suit boss and his
+        /// spread-shot shotgun. One long strict left-right-left zigzag,
+        /// meeting every enemy in the order they were introduced: the rival,
+        /// then a gunner, then a rocketeer, then the boss. Kill him, and
+        /// Bond comes down for the gun himself.
+        public static LevelConfig Level10() => new LevelConfig
+        {
+            name = "Level 10",
+            gun = GunConfig.Blaster(),
+            gravityY = -12f,
+            skyBottom = new Color(0.10f, 0.05f, 0.16f),
+            skyTop = new Color(0.30f, 0.15f, 0.42f),
+            ambient = new Color(0.13f, 0.10f, 0.18f),
+            burstHeight = 4.5f,
+            wallLeft = -34f,
+            wallRight = 34f,
+            ceiling = 90f,
+            bossFinale = true,
+            shelves = new[]
+            {
+                new Shelf( 24f,  0.75f, 12f, 2.5f), //  0: top  2: catch pad
+                new Shelf( -2f,  4.5f,   7f, 2f),   //  1: top  5.5: stone
+                new Shelf(-28f,  7.75f, 12f, 2.5f), //  2: top  9: left balcony
+                new Shelf(  2f, 12f,     7f, 2f),   //  3: top 13: stone
+                new Shelf( 28f, 15.75f, 12f, 2.5f), //  4: top 17: RIVAL's balcony
+                new Shelf( -2f, 20f,     7f, 2f),   //  5: top 21: stone
+                new Shelf(-28f, 23.75f, 12f, 2.5f), //  6: top 25: left balcony
+                new Shelf(  2f, 28f,     7f, 2f),   //  7: top 29: stone
+                new Shelf( 28f, 31.75f, 12f, 2.5f), //  8: top 33: GUNNER's balcony
+                new Shelf( -2f, 36f,     7f, 2f),   //  9: top 37: stone
+                new Shelf(-28f, 39.75f, 12f, 2.5f), // 10: top 41: left balcony
+                new Shelf(  2f, 44f,     7f, 2f),   // 11: top 45: stone
+                new Shelf( 28f, 47.75f, 12f, 2.5f), // 12: top 49: ROCKETEER's balcony
+                new Shelf( -2f, 52f,     7f, 2f),   // 13: top 53: stone
+                new Shelf(-28f, 55.75f, 12f, 2.5f), // 14: top 57: left balcony
+                new Shelf( 28f, 61.75f, 12f, 2.5f), // 15: top 63: last stop under the heli
+            },
+            villainShelves = new[] { 4 },
+            gunnerShelves = new[] { 8 },
+            rocketeerShelves = new[] { 12 },
+            glassPanes = new[]
+            {
+                new Shelf( 14f, 31f, 0.5f, 9f),  // guards the gunner's approach
+                new Shelf(-14f, 43f, 0.5f, 9f),  // guards the arc past the rocketeer
+            },
+            routePickups = new[]
+            {
+                new Vector2( 24f,  4.5f),
+                new Vector2( -2f,  8f),
+                new Vector2(-28f, 11.5f),
+                new Vector2(  2f, 15.5f),
+                new Vector2( 28f, 19.5f),
+                new Vector2( -2f, 23.5f),
+                new Vector2(-28f, 27.5f),
+                new Vector2(  2f, 31.5f),
+                new Vector2( 28f, 35.5f),
+                new Vector2( -2f, 39.5f),
+                new Vector2(-28f, 43.5f),
+                new Vector2(  2f, 47.5f),
+                new Vector2( 28f, 51.5f),
+                new Vector2( -2f, 55.5f),
+                new Vector2(-28f, 59.5f),
+                new Vector2( 28f, 65.5f),
+            },
+            summit = new Vector2(0f, 72f),    // the helicopter's hover anchor
+            signPos = new Vector2(12f, 32f),  // arrow points up the canyon
         };
     }
 }

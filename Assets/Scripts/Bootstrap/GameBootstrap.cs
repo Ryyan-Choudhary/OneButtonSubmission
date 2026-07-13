@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using OneButtonSubmission.Components;
 using OneButtonSubmission.Art;
 using OneButtonSubmission.Audio;
@@ -59,6 +60,7 @@ namespace OneButtonSubmission.Bootstrap
                 LevelConfig.Level1(), LevelConfig.Level2(), LevelConfig.Level3(),
                 LevelConfig.Level4(), LevelConfig.Level5(), LevelConfig.Level6(),
                 LevelConfig.Level7(), LevelConfig.Level8(), LevelConfig.Level9(),
+                LevelConfig.Level10(),
             };
 
             BuildMaterials();
@@ -71,14 +73,49 @@ namespace OneButtonSubmission.Bootstrap
 
             ApplyAtmosphere(Palette.Ambient, Palette.SkyBottom, Palette.SkyTop);
             TitleFlow.Create(this);
+
+            // DEBUG ONLY: X skips to the next level. Remove before shipping.
+            skipAction = new InputAction("DebugSkip", InputActionType.Button);
+            skipAction.AddBinding("<Keyboard>/x");
+            skipAction.started += OnDebugSkip;
+            skipAction.Enable();
+        }
+
+        InputAction skipAction;
+
+        void OnDestroy()
+        {
+            if (skipAction == null) return;
+            skipAction.started -= OnDebugSkip;
+            skipAction.Dispose();
+        }
+
+        /// DEBUG ONLY: jump straight to the next level, cleaning up any
+        /// cutscene or prompt that lives outside the level root.
+        void OnDebugSkip(InputAction.CallbackContext ctx)
+        {
+            if (levelRoot == null) return; // on the title/prologue — nothing to skip
+            foreach (var i in FindObjectsByType<Level1Intro>(FindObjectsSortMode.None))
+                Destroy(i.gameObject);
+            foreach (var i in FindObjectsByType<Level10Intro>(FindObjectsSortMode.None))
+                Destroy(i.gameObject);
+            foreach (var p in FindObjectsByType<RetryPrompt>(FindObjectsSortMode.None))
+                Destroy(p.gameObject);
+            hud.bannerText = "";
+
+            int next = currentLevel + 1;
+            if (next >= levels.Length) return; // nothing past the finale
+            BuildLevel(next);
         }
 
         bool pendingIntro;
+        bool finaleIntroSeen;
 
         public void BeginGame()
         {
-            GameStats.Reset();   // fresh run, clean tally
-            pendingIntro = true; // the suitcase cutscene plays once, not on retries
+            GameStats.Reset();      // fresh run, clean tally
+            pendingIntro = true;    // the suitcase cutscene plays once, not on retries
+            finaleIntroSeen = false; // same rule for the level-10 capture cutscene
             BuildLevel(0);
         }
 
@@ -219,6 +256,8 @@ namespace OneButtonSubmission.Bootstrap
             var gunRb = gun.GetComponent<Rigidbody>();
             bool intro = pendingIntro && index == 0;
             pendingIntro = false;
+            bool finaleIntro = lv.bossFinale && !finaleIntroSeen;
+            if (finaleIntro) finaleIntroSeen = true;
 
             // terrain: balconies over a fatal drop — no floor
             BuildShelves(lv, levelRoot.transform);
@@ -229,8 +268,12 @@ namespace OneButtonSubmission.Bootstrap
                 foreach (var p in lv.routePickups)
                     Parent(BuildAmmoPickup(new Vector3(p.x, p.y, 0f)));
 
-            // summit: landing anywhere on the final shelf wins; the flag is a beacon
-            Parent(BuildSummit(lv, lv.shelves[lv.shelves.Length - 1], manager, hud));
+            // summit: landing anywhere on the final shelf wins — except the
+            // finale, where the goal is the boss on his helicopter
+            if (lv.bossFinale)
+                BuildBossFinale(lv, levelRoot.transform);
+            else
+                Parent(BuildSummit(lv, lv.shelves[lv.shelves.Length - 1], manager, hud));
             BuildNeonArrow(lv, levelRoot.transform);
             BuildGlassPanes(lv, levelRoot.transform);   // before shooters: lanes raycast the panes
             BuildShooters(lv, levelRoot.transform);     // after geometry: fire lanes raycast the walls
@@ -270,6 +313,22 @@ namespace OneButtonSubmission.Bootstrap
                 cin.seed = backgroundSeed;
                 cin.onLaunch = () => LaunchEntry(gun);
                 cin.BuildAndPlay();
+            }
+            else if (finaleIntro)
+            {
+                // the capture cutscene: camera on the helicopter, then the dive
+                gunRb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                gunRb.isKinematic = true;
+                gun.enabled = false;
+                var fin = new GameObject("Level10Intro").AddComponent<Level10Intro>();
+                fin.cam = builtCamera;
+                fin.follow = follow;
+                fin.gun = gun;
+                fin.heliFocus = new Vector3(lv.summit.x, lv.summit.y, 0f);
+                fin.wallRight = lv.wallRight;
+                fin.burstHeight = lv.burstHeight;
+                fin.onLaunch = () => LaunchEntry(gun);
+                fin.Play();
             }
             else
             {
@@ -349,6 +408,82 @@ namespace OneButtonSubmission.Bootstrap
                 enemy.Build();
                 go.transform.SetParent(parent, true);
             }
+        }
+
+        /// Level 10's summit: a black helicopter hovering over the climb,
+        /// the purple-suit boss on its rear deck, Bond caged behind him.
+        /// Killing the boss triggers the rescue and the ending — there is
+        /// no walk-in win volume on this level.
+        void BuildBossFinale(LevelConfig lv, Transform parent)
+        {
+            var heliGo = new GameObject("Helicopter");
+            heliGo.transform.position = new Vector3(lv.summit.x, lv.summit.y, 0f);
+            var heli = heliGo.AddComponent<FinaleHelicopter>();
+            heli.Build();
+            heliGo.transform.SetParent(parent, true);
+
+            // Bond, caged on the rear of the deck
+            var bondGo = new GameObject("Bond");
+            bondGo.transform.position = heli.CageAnchor;
+            var bond = bondGo.AddComponent<SummitAgent>();
+            bond.facing = -1f;
+            bond.Build();
+            var bondLabel = bondGo.AddComponent<CharacterLabel>();
+            bondLabel.labelText = "James Bond";
+            bondLabel.worldYOffset = 7.5f;
+            bondGo.transform.SetParent(heliGo.transform, true);
+            var cage = BuildCage(heli.CageAnchor, heliGo.transform);
+
+            // the boss, watching the canyon from the deck's front
+            var bossGo = new GameObject("Boss");
+            bossGo.transform.position = heli.BossAnchor;
+            var boss = bossGo.AddComponent<ShooterEnemy>();
+            boss.kind = ShooterEnemy.Kind.Boss;
+            boss.facing = -1f;
+            boss.hud = hud;
+            boss.onRetry = () => BuildLevel(currentLevel);
+            boss.Build();
+            bossGo.transform.SetParent(heliGo.transform, true);
+
+            var finale = levelRoot.AddComponent<Level10Finale>();
+            finale.bond = bond;
+            finale.cage = cage;
+            finale.levelRoot = levelRoot.transform;
+            finale.onVictory = () => EndingScreen.Show(ReturnToTitle);
+            boss.onKilled = finale.BossDown;
+        }
+
+        GameObject BuildCage(Vector3 anchor, Transform parent)
+        {
+            var cage = new GameObject("Cage");
+            cage.transform.position = anchor;
+            var barMat = MaterialFactory.Lit(new Color(0.12f, 0.12f, 0.15f), 0.5f, 0.6f);
+            for (int i = 0; i < 5; i++)
+                Visual(PrimitiveType.Cube, cage.transform,
+                    new Vector3(-2f + i * 1f, 3.2f, -1.1f),
+                    new Vector3(0.14f, 6.4f, 0.14f), barMat, $"Bar{i}");
+            Visual(PrimitiveType.Cube, cage.transform, new Vector3(0f, 6.45f, 0f),
+                new Vector3(4.4f, 0.18f, 2.6f), barMat, "CageTop");
+            Visual(PrimitiveType.Cube, cage.transform, new Vector3(0f, 0.06f, 0f),
+                new Vector3(4.4f, 0.14f, 2.6f), barMat, "CageBase");
+            cage.transform.SetParent(parent, true);
+            return cage;
+        }
+
+        /// After the ending screen: tear the level down, reset the HUD, and
+        /// hand the stage back to the title flow.
+        void ReturnToTitle()
+        {
+            Time.timeScale = 1f;
+            if (levelRoot != null) Destroy(levelRoot);
+            hud.gun = null;
+            hud.ammo = null;
+            hud.levelNumber = 0;
+            hud.bannerText = "";
+            slowMoFx.gun = null;
+            follow.target = null;
+            ApplyAtmosphere(Palette.Ambient, Palette.SkyBottom, Palette.SkyTop);
+            TitleFlow.Create(this);
         }
 
         /// Club-style sign mounted mid-level (beside the middle building),

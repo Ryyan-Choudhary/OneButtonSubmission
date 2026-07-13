@@ -16,12 +16,13 @@ namespace OneButtonSubmission.Components
     /// melee rival: gibs, blood, a mark on the tally.
     public class ShooterEnemy : MonoBehaviour
     {
-        public enum Kind { Gunner, Rocketeer }
+        public enum Kind { Gunner, Rocketeer, Boss }
 
         public Kind kind;
         public float facing = 1f;
         public HudController hud;       // for the retry prompt on a gun kill
         public System.Action onRetry;
+        public System.Action onKilled;  // the finale listens for the boss's death
 
         SummitAgent rig;
         Transform fireLane;
@@ -30,16 +31,18 @@ namespace OneButtonSubmission.Components
 
         // the rocketeer's cycle is shorter because each launch now spends
         // ~1s on the lock-on telegraph first — net cadence is unchanged
-        float FireInterval => kind == Kind.Gunner ? 2.4f : 3.6f;
+        float FireInterval => kind == Kind.Gunner ? 2.4f
+                            : kind == Kind.Rocketeer ? 3.6f
+                            : 3.0f; // boss
 
         public void Build()
         {
             rig = new GameObject("Rig").AddComponent<SummitAgent>();
             rig.transform.SetParent(transform, false);
             rig.facing = facing;
-            rig.wardrobe = kind == Kind.Gunner
-                ? SummitAgent.Wardrobe.TrenchCoat
-                : SummitAgent.Wardrobe.HeavyGear;
+            rig.wardrobe = kind == Kind.Gunner ? SummitAgent.Wardrobe.TrenchCoat
+                         : kind == Kind.Rocketeer ? SummitAgent.Wardrobe.HeavyGear
+                         : SummitAgent.Wardrobe.PurpleSuit;
             rig.Build();
 
             // hit volume on a direct child (positive scale — the rig's
@@ -53,7 +56,9 @@ namespace OneButtonSubmission.Components
             hitGo.AddComponent<EnemyHitBox>().owner = this;
 
             var label = gameObject.AddComponent<CharacterLabel>();
-            label.labelText = kind == Kind.Gunner ? "Hired Gun" : "Rocket Man";
+            label.labelText = kind == Kind.Gunner ? "Hired Gun"
+                            : kind == Kind.Rocketeer ? "Rocket Man"
+                            : "Scarface";
             label.worldYOffset = 7.5f;
 
             if (kind == Kind.Gunner) BuildFireLane();
@@ -63,11 +68,13 @@ namespace OneButtonSubmission.Components
             cooldown = FireInterval * (0.5f + 0.6f * phase);
         }
 
-        /// The pistol's muzzle / the launcher tube's mouth, in world space
-        /// (the rig transform carries the facing mirror and the 3.2 scale).
+        /// The weapon's muzzle in world space (the rig transform carries the
+        /// facing mirror and the 3.2 scale).
         Vector3 MuzzlePos() => kind == Kind.Gunner
             ? rig.transform.TransformPoint(1.05f, 1.06f, 0f)
-            : rig.transform.TransformPoint(0.70f, 1.55f, 0.12f);
+            : kind == Kind.Rocketeer
+            ? rig.transform.TransformPoint(0.70f, 1.55f, 0.12f)
+            : rig.transform.TransformPoint(1.25f, 1.06f, 0f); // shotgun tip
 
         /// A dim red line from the pistol to whatever the lane ends on, so
         /// the player can read the danger zone from across the canyon.
@@ -112,10 +119,33 @@ namespace OneButtonSubmission.Components
                     Vector3.right * facing, this);
                 AudioManager.Play(AudioManager.Sfx.Gunshot);
             }
-            else
+            else if (kind == Kind.Rocketeer)
             {
                 StartCoroutine(LockOnAndFire());
             }
+            else
+            {
+                FireSpread();
+            }
+        }
+
+        /// The boss's shotgun: a 5-pellet fan aimed at the player, pellets
+        /// sagging slowly under gravity so the spread rains down the canyon.
+        /// He holds fire until the player is close enough to matter.
+        void FireSpread()
+        {
+            var gunBody = Object.FindFirstObjectByType<GunBody>();
+            if (gunBody == null) return;
+            Vector3 toPlayer = gunBody.transform.position - MuzzlePos();
+            if (toPlayer.magnitude > 45f) return; // still far below — hold fire
+
+            Vector3 baseDir = toPlayer.normalized;
+            for (int i = -2; i <= 2; i++)
+            {
+                Vector3 d = Quaternion.Euler(0f, 0f, i * 9f) * baseDir;
+                EnemyPellet.Spawn(MuzzlePos() + d * 0.8f, d, 13f, this);
+            }
+            AudioManager.Play(AudioManager.Sfx.Gunshot);
         }
 
         /// Missile-lock telegraph: a red reticle clamps onto the player's gun,
@@ -150,6 +180,7 @@ namespace OneButtonSubmission.Components
             for (int i = 0; i < parts.Length; i++)
                 Gib.Spawn(parts[i], hitDir, rng, bleeds: i % 3 == 0);
             BloodFx.Burst(transform.position + Vector3.up * 2.5f, hitDir);
+            onKilled?.Invoke();
             Destroy(gameObject);
             return true;
         }

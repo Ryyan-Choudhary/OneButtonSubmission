@@ -15,7 +15,7 @@ namespace OneButtonSubmission.Components
         /// his white suit, the gunner in a brown trench coat and flat cap
         /// with a drawn pistol, the rocketeer in olive fatigues with a flak
         /// vest, helmet, and shoulder tube. Auto maps the old bool flags.
-        public enum Wardrobe { Auto, Suit, Shirtsleeves, WhiteSuit, TrenchCoat, HeavyGear }
+        public enum Wardrobe { Auto, Suit, Shirtsleeves, WhiteSuit, TrenchCoat, HeavyGear, PurpleSuit }
 
         public float facing = 1f; // +1 faces right, -1 faces left
         public float scale = 3.2f; // whole-rig size multiplier (~5.6 units tall)
@@ -61,6 +61,11 @@ namespace OneButtonSubmission.Components
                     suitCol  = new Color(0.97f, 0.96f, 0.94f);
                     shirtCol = new Color(0.14f, 0.12f, 0.10f);
                     tieCol   = new Color(0.95f, 0.10f, 0.08f);
+                    break;
+                case Wardrobe.PurpleSuit: // the boss: royal purple, gold tie, and the scar
+                    suitCol  = new Color(0.45f, 0.14f, 0.60f);
+                    shirtCol = new Color(0.92f, 0.90f, 0.88f);
+                    tieCol   = new Color(0.95f, 0.75f, 0.20f);
                     break;
                 default:                  // Bond & the quartermaster: black suit, white shirt
                     suitCol  = new Color(0.07f, 0.07f, 0.09f);
@@ -111,10 +116,26 @@ namespace OneButtonSubmission.Components
             Box(head, new Vector3( 0.08f, 0.04f, -0.15f), new Vector3(0.11f, 0.08f, 0.05f), glassMat, "LensR");
             Box(head, new Vector3(-0.08f, 0.04f, -0.15f), new Vector3(0.11f, 0.08f, 0.05f), glassMat, "LensL");
             Box(head, new Vector3( 0f,    0.04f, -0.15f), new Vector3(0.05f, 0.03f, 0.05f), glassMat, "Bridge");
-            if (look == Wardrobe.Suit || look == Wardrobe.WhiteSuit)
+            if (look == Wardrobe.Suit || look == Wardrobe.WhiteSuit || look == Wardrobe.PurpleSuit)
             {
                 Box(head, new Vector3(0f, 0.17f, 0f), new Vector3(0.46f, 0.05f, 0.4f), suitMat, "HatBrim");
                 Box(head, new Vector3(0f, 0.28f, 0f), new Vector3(0.3f, 0.18f, 0.28f), suitMat, "HatCrown");
+            }
+
+            if (look == Wardrobe.PurpleSuit)
+            {
+                // the scar: a jagged line down across the cheek, past the lens
+                var scarMat = MaterialFactory.Lit(new Color(0.62f, 0.28f, 0.22f), 0.2f);
+                var scar = Box(head, new Vector3(0.10f, -0.02f, -0.152f),
+                    new Vector3(0.035f, 0.20f, 0.02f), scarMat, "Scar");
+                scar.transform.localRotation = Quaternion.Euler(0f, 0f, -22f);
+
+                // the spread shotgun on a level arm: long barrel, wood stock
+                var barrelMat = MaterialFactory.Lit(new Color(0.10f, 0.10f, 0.13f), 0.5f, 0.6f);
+                var stockMat = MaterialFactory.Lit(new Color(0.35f, 0.22f, 0.12f), 0.3f);
+                Box(armR, new Vector3(0f, -0.62f, 0f), new Vector3(0.09f, 0.55f, 0.09f), barrelMat, "ShotgunBarrel");
+                Box(armR, new Vector3(0f, -0.34f, 0f), new Vector3(0.13f, 0.22f, 0.12f), stockMat, "ShotgunStock");
+                armR.localRotation = Quaternion.Euler(0f, 0f, 90f); // leveled at the canyon
             }
 
             if (look == Wardrobe.TrenchCoat)
@@ -335,7 +356,7 @@ namespace OneButtonSubmission.Components
             return t;
         }
 
-        void Box(Transform pivot, Vector3 lpos, Vector3 size, Material mat, string name)
+        GameObject Box(Transform pivot, Vector3 lpos, Vector3 size, Material mat, string name)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
@@ -344,6 +365,7 @@ namespace OneButtonSubmission.Components
             go.transform.localPosition = lpos;
             go.transform.localScale = size;
             go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+            return go;
         }
     }
 }
