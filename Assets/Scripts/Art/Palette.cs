@@ -63,13 +63,19 @@ namespace OneButtonSubmission.Art
             return m;
         }
 
+        /// A self-lit "glowing" material. Rendered with Unlit/Color rather than
+        /// Standard+_EMISSION: player builds strip the Standard shader's _EMISSION
+        /// shader_feature variant (every material here is built at runtime, so
+        /// nothing references the variant as an asset — Resources materials,
+        /// ShaderVariantCollections and Preloaded Shaders were all tried and none
+        /// kept it), which left every neon/window/tracer/debris material dark.
+        /// Unlit ships reliably and shows the glow colour at full brightness with
+        /// no lighting dependency, which is exactly how these elements should read.
+        /// `color`/`smoothness` are ignored (kept for call-site compatibility).
         public static Material Emissive(Color color, Color emission, float intensity = 1.5f, float smoothness = 0.3f)
         {
-            var m = Lit(color, smoothness, 0f);
-            m.EnableKeyword("_EMISSION");
-            m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-            m.SetColor("_EmissionColor", emission * intensity);
-            return m;
+            Color c = emission * intensity;
+            return Unlit(new Color(Mathf.Clamp01(c.r), Mathf.Clamp01(c.g), Mathf.Clamp01(c.b), 1f));
         }
 
         public static Material Unlit(Color color)

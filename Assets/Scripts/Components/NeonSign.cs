@@ -56,7 +56,9 @@ namespace OneButtonSubmission.Components
                 intensity = 1.7f + 0.5f * Mathf.Sin(Time.time * 2.4f);
                 if (Random.value < 0.008f) flickerT = Random.Range(0.04f, 0.13f);
             }
-            neonMat.SetColor("_EmissionColor", baseColor * intensity);
+            // neonMat is an Unlit/Color material (see MaterialFactory.Emissive),
+            // so the flicker drives its _Color, not _EmissionColor.
+            neonMat.color = baseColor * intensity;
         }
     }
 }
