@@ -1,4 +1,5 @@
 using UnityEngine;
+using OneButtonSubmission.Art;
 
 namespace OneButtonSubmission.Components
 {
@@ -82,6 +83,8 @@ namespace OneButtonSubmission.Components
             var shape = ps.shape;
             shape.shapeType = ParticleSystemShapeType.Sphere;
             shape.radius = 0.3f;
+            // player builds give runtime particle systems no default material
+            go.GetComponent<ParticleSystemRenderer>().material = MaterialFactory.SoftParticle();
             ps.Emit(45);
             Object.Destroy(go, 1.4f);
         }
@@ -106,6 +109,7 @@ namespace OneButtonSubmission.Components
             main.scalingMode = ParticleSystemScalingMode.Shape;
             var em = ps.emission;
             em.rateOverTime = 34f;
+            go.GetComponent<ParticleSystemRenderer>().material = MaterialFactory.SoftParticle();
             ps.Play();
         }
     }

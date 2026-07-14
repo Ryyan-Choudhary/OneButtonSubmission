@@ -19,11 +19,21 @@ namespace OneButtonSubmission.Art
                 if (!searched)
                 {
                     searched = true;
+#if !UNITY_WEBGL || UNITY_EDITOR
+                    // WebGL players have no OS fonts at all; elsewhere a
+                    // missing face can still come back as a non-null Font
+                    // that rasterizes nothing, so only trust one that can
+                    // actually produce a glyph.
                     foreach (var name in new[] { "Impact", "Haettenschweiler", "Arial Narrow" })
                     {
-                        font = Font.CreateDynamicFontFromOSFont(name, 32);
-                        if (font != null) break;
+                        var candidate = Font.CreateDynamicFontFromOSFont(name, 32);
+                        if (candidate != null && candidate.HasCharacter('A'))
+                        {
+                            font = candidate;
+                            break;
+                        }
                     }
+#endif
                 }
                 return font;
             }

@@ -75,10 +75,6 @@ namespace OneButtonSubmission.Bootstrap
             TitleFlow.Create(this);
 
             // DEBUG ONLY: X skips to the next level. Remove before shipping.
-            skipAction = new InputAction("DebugSkip", InputActionType.Button);
-            skipAction.AddBinding("<Keyboard>/x");
-            skipAction.started += OnDebugSkip;
-            skipAction.Enable();
         }
 
         InputAction skipAction;
@@ -1150,6 +1146,9 @@ namespace OneButtonSubmission.Bootstrap
             var emission = ps.emission;
             emission.enabled = false;
             ps.Stop();
+            // runtime-added particle systems get no material in player builds
+            // (the soft round default is editor-only) — assign one explicitly
+            go.GetComponent<ParticleSystemRenderer>().material = MaterialFactory.SoftParticle();
 
             // lingering smoke puffs behind the flash
             var smokeGo = new GameObject("MuzzleSmoke");
@@ -1165,6 +1164,7 @@ namespace OneButtonSubmission.Bootstrap
             var sEmission = smoke.emission;
             sEmission.enabled = false;
             smoke.Stop();
+            smokeGo.GetComponent<ParticleSystemRenderer>().material = MaterialFactory.SoftParticle();
 
             gun.OnFired += () =>
             {

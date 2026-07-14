@@ -120,6 +120,8 @@ namespace OneButtonSubmission.Bootstrap
             var emission = ps.emission;
             emission.enabled = false;
             ps.Stop();
+            // player builds give runtime particle systems no default material
+            go.GetComponent<ParticleSystemRenderer>().material = MaterialFactory.SoftParticle();
             return ps;
         }
 
@@ -160,6 +162,7 @@ namespace OneButtonSubmission.Bootstrap
                 new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.85f, 0.15f), new GradientAlphaKey(0f, 1f) });
             col.color = grad;
 
+            go.GetComponent<ParticleSystemRenderer>().material = MaterialFactory.SoftParticle();
             return ps;
         }
 
